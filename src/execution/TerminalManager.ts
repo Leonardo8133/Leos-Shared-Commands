@@ -69,6 +69,11 @@ export class TerminalManager {
   }
 
   private async executeInTerminal(terminal: vscode.Terminal, command: string, config: TerminalConfig): Promise<void> {
+    // Store terminal reference if we want to keep it open (do this first)
+    if (config.keepOpen && config.name) {
+      this.terminals.set(config.name, terminal);
+    }
+
     if (config.clearBeforeRun) {
       terminal.sendText('clear');
     }
@@ -79,11 +84,6 @@ export class TerminalManager {
     }
 
     terminal.sendText(command);
-
-    // Store terminal reference if we want to keep it open
-    if (config.keepOpen && config.name) {
-      this.terminals.set(config.name, terminal);
-    }
   }
 
   private async executeInExternalCmd(command: string, config: TerminalConfig): Promise<void> {

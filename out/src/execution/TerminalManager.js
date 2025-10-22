@@ -93,6 +93,10 @@ class TerminalManager {
         await this.executeInTerminal(terminal, command, config);
     }
     async executeInTerminal(terminal, command, config) {
+        // Store terminal reference if we want to keep it open (do this first)
+        if (config.keepOpen && config.name) {
+            this.terminals.set(config.name, terminal);
+        }
         if (config.clearBeforeRun) {
             terminal.sendText('clear');
         }
@@ -101,10 +105,6 @@ class TerminalManager {
             terminal.sendText(`cd "${config.cwd}"`);
         }
         terminal.sendText(command);
-        // Store terminal reference if we want to keep it open
-        if (config.keepOpen && config.name) {
-            this.terminals.set(config.name, terminal);
-        }
     }
     async executeInExternalCmd(command, config) {
         const args = ['/c', 'start', 'cmd', '/k', command];

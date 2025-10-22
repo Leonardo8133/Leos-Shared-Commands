@@ -2,26 +2,48 @@
   "name": "command-manager",
   "displayName": "Command Manager",
   "description": "Manage and execute commands with variables, chains, and flexible terminal options",
-  "version": "1.0.0",
-  "publisher": "your-name",
+  "version": "1.0.0",  
+  "publisher": "LeonardoSouza",
+  "author": {
+    "name": "Leonardo de Souza Chaves",
+    "email": "leonardo2sc@gmail.com"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "command",
+    "manager",
+    "variables",
+    "terminal",
+    "options",
+    "readme",
+    "documentation",
+    "list"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Leonardo8133/Leos-Shared-Commands"
+  },
+  "homepage": "https://github.com/Leonardo8133/Leos-Shared-Commands#readme",
+  "bugs": {
+    "url": "https://github.com/Leonardo8133/Leos-Shared-Commands/issues"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
   "main": "./out/src/extension.js",
-  "icon": "resources/icon.svg",
+  "icon": "resources/add-list.png",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "command-manager",
           "title": "Command Manager",
-          "icon": "resources/icon.svg"
+          "icon": "resources/add-list.png"
         }
       ]
     },

@@ -86,6 +86,10 @@
         color: var(--vscode-errorForeground);
         text-decoration: underline dotted;
       }
+      .variable-tag--input {
+        color: #4CAF50;
+        text-decoration: underline;
+      }
       .variables-table {
         display: flex;
         flex-direction: column;
@@ -93,13 +97,13 @@
       }
       .variables-header {
         display: grid;
-        grid-template-columns: 120px 150px 150px 200px 20px;
+        grid-template-columns: 15% 15% 15% 50% 3%;
         gap: 6px;
         margin-bottom: 4px;
       }
       .variable-row {
         display: grid;
-        grid-template-columns: 120px 150px 150px 200px 20px;
+        grid-template-columns: 15% 15% 15% 50% 3%;
         gap: 6px;
         align-items: start;
       }
@@ -748,9 +752,14 @@
         const highlighted = escaped.replace(/\$([A-Za-z0-9_]+)/g, (_, key) => {
           const metadata = getVariableMetadata(key);
           const classes = ['variable-tag'];
-          if (!metadata.configured) {
+          
+          // Special styling for $input variable
+          if (key === 'input') {
+            classes.push('variable-tag--input');
+          } else if (!metadata.configured) {
             classes.push('variable-tag--missing');
           }
+          
           const title = metadata.tooltip.replace(/"/g, '&quot;');
           return `<span class="${classes.join(' ')}" title="${title}">$${key}</span>`;
         });
@@ -846,10 +855,27 @@
       function renderDropdownItems() {
         elements.dropdown.innerHTML = '';
         const variables = getDropdownItems();
+        
+        // Add Manual Input option first
+        const manualInputButton = document.createElement('button');
+        manualInputButton.type = 'button';
+        manualInputButton.innerHTML = `
+          <span style="flex:1;">$input</span>
+          <span class="type">Manual Input (User Prompt)</span>
+        `;
+        manualInputButton.style.backgroundColor = '#007acc';
+        manualInputButton.style.color = 'white';
+        manualInputButton.addEventListener('click', () => {
+          insertVariable('input');
+          hideVariableDropdown();
+        });
+        elements.dropdown.appendChild(manualInputButton);
+        
         if (variables.length === 0) {
           const placeholder = document.createElement('div');
-          placeholder.textContent = 'No variables available yet.';
+          placeholder.textContent = 'No other variables available.';
           placeholder.style.padding = '8px';
+          placeholder.style.fontStyle = 'italic';
           elements.dropdown.appendChild(placeholder);
           return;
         }

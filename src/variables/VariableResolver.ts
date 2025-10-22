@@ -86,6 +86,22 @@ export class VariableResolver {
     const resolved: ResolvedVariable[] = [];
 
     for (const key of placeholders) {
+      // Handle manual input variable
+      if (key === 'input') {
+        const userInput = await vscode.window.showInputBox({
+          prompt: 'Enter input for the command',
+          placeHolder: 'Type your input here (can be empty)',
+          value: ''
+        });
+
+        if (userInput === undefined) {
+          throw new UserCancelledError();
+        }
+
+        resolved.push({ key, value: userInput || '' });
+        continue;
+      }
+
       const variableDefinition = commandVariables.get(key);
       const sharedVariable = variableMap.get(key);
       const sharedList = listMap.get(key);
@@ -123,15 +139,36 @@ export class VariableResolver {
           throw new MissingVariableError(key);
         }
 
-        const selection = await vscode.window.showQuickPick(options, {
-          placeHolder: `Select ${quickPickLabel}`
+        // Add custom input option to the list
+        const customInputOption = '✏️ Custom Input...';
+        const allOptions = [customInputOption, ...options];
+
+        const selection = await vscode.window.showQuickPick(allOptions, {
+          placeHolder: `Select ${quickPickLabel} or choose custom input`
         });
 
         if (!selection) {
           throw new UserCancelledError();
         }
 
-        resolved.push({ key, value: selection });
+        let finalValue = selection;
+
+        // If custom input was selected, prompt for manual input
+        if (selection === customInputOption) {
+          const customInput = await vscode.window.showInputBox({
+            prompt: `Enter custom value for ${quickPickLabel}`,
+            placeHolder: 'Type your custom option here',
+            value: ''
+          });
+
+          if (customInput === undefined) {
+            throw new UserCancelledError();
+          }
+
+          finalValue = customInput || '';
+        }
+
+        resolved.push({ key, value: finalValue });
         continue;
       }
     }

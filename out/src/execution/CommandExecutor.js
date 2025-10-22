@@ -158,25 +158,18 @@ class CommandExecutor {
         if (this.treeProvider) {
             this.treeProvider.setCommandRunning(command.id);
         }
-        return await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: `Executing: ${command.label}`,
-            cancellable: false
-        }, async (progress) => {
-            progress.report({ increment: 0, message: 'Preparing command...' });
-            const result = await this.executeCommand(command);
-            progress.report({ increment: 100, message: 'Command executed' });
-            // Update tree icon based on result
-            if (this.treeProvider) {
-                if (result.success) {
-                    this.treeProvider.setCommandSuccess(command.id);
-                }
-                else {
-                    this.treeProvider.setCommandError(command.id);
-                }
+        // Execute command without progress notification to avoid interference with input dialogs
+        const result = await this.executeCommand(command);
+        // Update tree icon based on result
+        if (this.treeProvider) {
+            if (result.success) {
+                this.treeProvider.setCommandSuccess(command.id);
             }
-            return result;
-        });
+            else {
+                this.treeProvider.setCommandError(command.id);
+            }
+        }
+        return result;
     }
     async previewCommand(command) {
         let resolvedCommand = command.command;

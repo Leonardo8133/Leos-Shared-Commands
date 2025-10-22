@@ -1,0 +1,65 @@
+[
+  {
+    "version": 0,
+    "timestamp": "2025-10-22T17:49:09.515Z",
+    "config": {
+      "folders": [
+        {
+          "name": "Samples",
+          "icon": "$(beaker)",
+          "commands": [
+            {
+              "id": "hello-world",
+              "label": "Echo Hello",
+              "command": "echo \"Hello from Command Manager\"",
+              "terminal": {
+                "type": "vscode-new",
+                "name": "Command Manager",
+                "keepOpen": true
+              },
+              "description": "Sample command that echoes a welcome message"
+            },
+            {
+              "id": "build-environment",
+              "label": "Build for environment",
+              "command": "npm run build -- --env $ENVIRONMENT_NAME",
+              "terminal": {
+                "type": "vscode-current",
+                "keepOpen": true
+              },
+              "variables": [
+                {
+                  "key": "ENVIRONMENT_NAME",
+                  "value": "production\ndevelopment\nstaging",
+                  "label": "Environment",
+                  "type": "options"
+                }
+              ],
+              "description": "Builds the project using one of the configured environments"
+            }
+          ]
+        }
+      ],
+      "sharedVariables": [
+        {
+          "key": "PROJECT_ROOT",
+          "label": "Project root",
+          "value": "${workspaceFolder}",
+          "description": "Path to the current workspace folder"
+        }
+      ],
+      "sharedLists": [
+        {
+          "key": "ENVIRONMENT_NAME",
+          "label": "Environment",
+          "options": [
+            "local",
+            "staging",
+            "production"
+          ],
+          "description": "Common deployment targets"
+        }
+      ]
+    }
+  }
+]

@@ -191,6 +191,7 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
     }, 5000);
   }
 
+
   public dispose(): void {
     this._onDidChangeTreeData.dispose();
     this.commandTreeItems.clear();
