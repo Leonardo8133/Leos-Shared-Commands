@@ -1,12 +1,23 @@
 import * as vscode from 'vscode';
-import { Variable, ResolvedVariable } from '../types';
+import { Command, CommandVariable, ResolvedVariable, SharedList, SharedVariable } from '../types';
+import { ConfigManager } from '../config/ConfigManager';
+import { MissingVariableError, UserCancelledError } from './errors';
+
+interface VariableMetadata {
+  key: string;
+  label?: string;
+  type: 'fixed' | 'list';
+  description?: string;
+  value?: string;
+  options?: string[];
+}
 
 export class VariableResolver {
   private static instance: VariableResolver;
-  private rememberedValues: Map<string, string> = new Map();
+  private readonly configManager: ConfigManager;
 
   private constructor() {
-    this.loadRememberedValues();
+    this.configManager = ConfigManager.getInstance();
   }
 
   public static getInstance(): VariableResolver {
@@ -16,140 +27,103 @@ export class VariableResolver {
     return VariableResolver.instance;
   }
 
-  public async resolveVariables(variables: Variable[]): Promise<ResolvedVariable[]> {
+  public extractPlaceholders(commandText: string): string[] {
+    const placeholders = new Set<string>();
+    const regex = /\$\{?([A-Za-z0-9_]+)\}?/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(commandText)) !== null) {
+      if (match[1]) {
+        placeholders.add(match[1]);
+      }
+    }
+
+    return Array.from(placeholders);
+  }
+
+  public getAvailableVariables(): VariableMetadata[] {
+    const config = this.configManager.getConfig();
+    const variables: VariableMetadata[] = [];
+
+    (config.sharedVariables || []).forEach((variable: SharedVariable) => {
+      variables.push({
+        key: variable.key,
+        label: variable.label,
+        type: 'fixed',
+        description: variable.description,
+        value: variable.value
+      });
+    });
+
+    (config.sharedLists || []).forEach((list: SharedList) => {
+      variables.push({
+        key: list.key,
+        label: list.label,
+        type: 'list',
+        description: list.description,
+        options: list.options
+      });
+    });
+
+    return variables;
+  }
+
+  public async resolveCommandVariables(command: Command): Promise<ResolvedVariable[]> {
+    const placeholders = this.extractPlaceholders(command.command);
+    if (placeholders.length === 0) {
+      return [];
+    }
+
+    const config = this.configManager.getConfig();
+    const variableMap = new Map((config.sharedVariables || []).map(v => [v.key, v] as const));
+    const listMap = new Map((config.sharedLists || []).map(l => [l.key, l] as const));
+    const commandVariables = new Map<string, CommandVariable>();
+
+    (command.variables || []).forEach(variable => {
+      commandVariables.set(variable.key, variable);
+    });
+
     const resolved: ResolvedVariable[] = [];
 
-    for (const variable of variables) {
-      try {
-        const value = await this.resolveVariable(variable);
-        resolved.push({ key: variable.key, value });
-        
-        if (variable.remember) {
-          this.rememberValue(variable.key, value);
-        }
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to resolve variable ${variable.key}: ${error}`);
-        throw error;
+    for (const key of placeholders) {
+      const variableDefinition = commandVariables.get(key);
+      const sharedVariable = variableMap.get(key);
+      const sharedList = listMap.get(key);
+
+      const type = variableDefinition?.type || (sharedList ? 'list' : sharedVariable ? 'fixed' : undefined);
+
+      if (!type) {
+        throw new MissingVariableError(key);
       }
+
+      if (type === 'fixed') {
+        if (!sharedVariable) {
+          throw new MissingVariableError(key);
+        }
+        resolved.push({ key, value: sharedVariable.value });
+        continue;
+      }
+
+      if (!sharedList) {
+        throw new MissingVariableError(key);
+      }
+
+      const quickPickLabel = variableDefinition?.label || sharedList.label || key;
+      const selection = await vscode.window.showQuickPick(sharedList.options, {
+        placeHolder: `Select ${quickPickLabel}`
+      });
+
+      if (!selection) {
+        throw new UserCancelledError();
+      }
+
+      resolved.push({ key, value: selection });
     }
 
     return resolved;
   }
 
-  private async resolveVariable(variable: Variable): Promise<string> {
-    switch (variable.type) {
-      case 'input':
-        return await this.resolveInputVariable(variable);
-      case 'file':
-        return await this.resolveFileVariable(variable);
-      case 'folder':
-        return await this.resolveFolderVariable(variable);
-      case 'environment':
-        return await this.resolveEnvironmentVariable(variable);
-      default:
-        throw new Error(`Unknown variable type: ${variable.type}`);
-    }
-  }
-
-  private async resolveInputVariable(variable: Variable): Promise<string> {
-    const defaultValue = variable.defaultValue || this.rememberedValues.get(variable.key) || '';
-    
-    const value = await vscode.window.showInputBox({
-      prompt: variable.label,
-      value: defaultValue,
-      placeHolder: `Enter ${variable.label.toLowerCase()}`
-    });
-
-    if (value === undefined) {
-      throw new Error('Variable input cancelled');
-    }
-
-    return value;
-  }
-
-  private async resolveQuickPickVariable(variable: Variable): Promise<string> {
-    const options = variable.options || [];
-    if (options.length === 0) {
-      throw new Error(`No options provided for quickpick variable ${variable.key}`);
-    }
-
-    const rememberedValue = this.rememberedValues.get(variable.key);
-    const selectedItem = await vscode.window.showQuickPick(options, {
-      placeHolder: `Select ${variable.label}`,
-      canPickMany: false
-    });
-
-    if (!selectedItem) {
-      throw new Error('Variable selection cancelled');
-    }
-
-    return selectedItem;
-  }
-
-  private async resolveFileVariable(variable: Variable): Promise<string> {
-    const options: vscode.OpenDialogOptions = {
-      canSelectMany: false,
-      openLabel: `Select ${variable.label}`,
-      filters: {
-        'All files': ['*']
-      }
-    };
-
-    const fileUri = await vscode.window.showOpenDialog(options);
-    if (!fileUri || fileUri.length === 0) {
-      throw new Error('File selection cancelled');
-    }
-
-    return fileUri[0].fsPath;
-  }
-
-  private async resolveFolderVariable(variable: Variable): Promise<string> {
-    const options: vscode.OpenDialogOptions = {
-      canSelectMany: false,
-      canSelectFolders: true,
-      canSelectFiles: false,
-      openLabel: `Select ${variable.label}`
-    };
-
-    const folderUri = await vscode.window.showOpenDialog(options);
-    if (!folderUri || folderUri.length === 0) {
-      throw new Error('Folder selection cancelled');
-    }
-
-    return folderUri[0].fsPath;
-  }
-
-  private async resolveEnvironmentVariable(variable: Variable): Promise<string> {
-    const envValue = process.env[variable.key];
-    if (envValue === undefined) {
-      throw new Error(`Environment variable ${variable.key} not found`);
-    }
-    return envValue;
-  }
-
-  private loadRememberedValues(): void {
-    const context = vscode.workspace.getConfiguration('commandManager');
-    const remembered = context.get<Record<string, string>>('rememberedValues', {});
-    this.rememberedValues = new Map(Object.entries(remembered));
-  }
-
-  private async rememberValue(key: string, value: string): Promise<void> {
-    this.rememberedValues.set(key, value);
-    const context = vscode.workspace.getConfiguration('commandManager');
-    const remembered = Object.fromEntries(this.rememberedValues);
-    await context.update('rememberedValues', remembered, vscode.ConfigurationTarget.Workspace);
-  }
-
-  public getRememberedValue(key: string): string | undefined {
-    return this.rememberedValues.get(key);
-  }
-
-  public clearRememberedValues(): void {
-    this.rememberedValues.clear();
-    vscode.workspace.getConfiguration('commandManager').update('rememberedValues', {}, vscode.ConfigurationTarget.Workspace);
-  }
-
   public dispose(): void {
-    this.rememberedValues.clear();
+    // No-op for compatibility with previous implementation
   }
 }

@@ -5,6 +5,7 @@ import { TerminalConfig } from '../types';
 export class TerminalManager {
   private static instance: TerminalManager;
   private terminals: Map<string, vscode.Terminal> = new Map();
+  private customRunner?: (command: string, config: TerminalConfig) => Promise<void>;
 
   private constructor() {}
 
@@ -16,6 +17,11 @@ export class TerminalManager {
   }
 
   public async executeCommand(command: string, config: TerminalConfig): Promise<void> {
+    if (this.customRunner) {
+      await this.customRunner(command, config);
+      return;
+    }
+
     switch (config.type) {
       case 'vscode-current':
         await this.executeInCurrentTerminal(command, config);
@@ -135,5 +141,9 @@ export class TerminalManager {
 
   public listTerminals(): string[] {
     return Array.from(this.terminals.keys());
+  }
+
+  public setRunner(runner?: (command: string, config: TerminalConfig) => Promise<void>): void {
+    this.customRunner = runner;
   }
 }

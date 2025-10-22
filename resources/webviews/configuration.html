@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'nonce-{{nonce}}'; font-src https://cdn.jsdelivr.net; img-src {{cspSource}} data:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configuration</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background: var(--vscode-editor-background);
+      }
+      .container {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .section {
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        padding: 12px;
+        background: var(--vscode-editor-background);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .section-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      form {
+        display: block;
+      }
+      .compact-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 6px 10px;
+        align-items: center;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 5px 7px;
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        font-size: 12px;
+      }
+      textarea {
+        min-height: 60px;
+        resize: vertical;
+        font-family: var(--vscode-editor-font-family, monospace);
+      }
+      .item-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 6px;
+      }
+      .card {
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        background: var(--vscode-editor-background);
+      }
+      .card-title {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .card-description {
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+      }
+      .card-actions {
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        border: none;
+        border-radius: 4px;
+        padding: 5px 12px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .primary-button {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+      .primary-button:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+      .secondary-button {
+        background: transparent;
+        color: var(--vscode-button-foreground);
+        border: 1px solid var(--vscode-button-border, var(--vscode-button-background));
+      }
+      .danger-button {
+        background: var(--vscode-errorForeground);
+        color: var(--vscode-editor-background);
+      }
+      .json-editor {
+        width: 100%;
+        min-height: 320px;
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 12px;
+        border-radius: 6px;
+        padding: 10px;
+        border: 1px solid var(--vscode-panel-border);
+        background: var(--vscode-editor-background);
+        color: var(--vscode-foreground);
+      }
+      .json-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 6px;
+      }
+      .compact-form button {
+        justify-self: end;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Configuration</h1>
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">Global variables</h2>
+          <small style="color: var(--vscode-descriptionForeground);">Fixed values shared by commands.</small>
+        </div>
+        <form id="variable-form" class="compact-form">
+          <div>
+            <label for="variable-key">Key</label>
+            <input id="variable-key" type="text" placeholder="PROJECT_ROOT" required />
+          </div>
+          <div>
+            <label for="variable-label">Label</label>
+            <input id="variable-label" type="text" placeholder="Project root" />
+          </div>
+          <div>
+            <label for="variable-value">Value</label>
+            <input id="variable-value" type="text" placeholder="${workspaceFolder}" required />
+          </div>
+          <div>
+            <label for="variable-description">Description</label>
+            <input id="variable-description" type="text" placeholder="Optional" />
+          </div>
+          <button type="submit" class="primary-button">Save variable</button>
+        </form>
+        <div class="item-grid" id="variables-list"></div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">Global lists</h2>
+          <small style="color: var(--vscode-descriptionForeground);">List values require selection before running a command.</small>
+        </div>
+        <form id="list-form" class="compact-form">
+          <div>
+            <label for="list-key">Key</label>
+            <input id="list-key" type="text" placeholder="ENVIRONMENT" required />
+          </div>
+          <div>
+            <label for="list-label">Label</label>
+            <input id="list-label" type="text" placeholder="Environment" />
+          </div>
+          <div>
+            <label for="list-options">Options (comma separated)</label>
+            <input id="list-options" type="text" placeholder="local, staging, production" required />
+          </div>
+          <div>
+            <label for="list-description">Description</label>
+            <input id="list-description" type="text" placeholder="Optional" />
+          </div>
+          <button type="submit" class="primary-button">Save list</button>
+        </form>
+        <div class="item-grid" id="lists"></div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">Raw configuration</h2>
+          <small style="color: var(--vscode-descriptionForeground);">Use JSON to edit everything. The editor loads the current config automatically.</small>
+        </div>
+        <textarea id="json-editor" class="json-editor"></textarea>
+        <div class="json-actions">
+          <button type="button" id="save-json" class="primary-button">Save configuration</button>
+        </div>
+      </div>
+    </div>
+    <script nonce="{{nonce}}">
+      const vscode = acquireVsCodeApi();
+      let currentConfig = null;
+      let editingVariableKey = null;
+      let editingListKey = null;
+
+      const elements = {
+        variableForm: document.getElementById('variable-form'),
+        variableKey: document.getElementById('variable-key'),
+        variableLabel: document.getElementById('variable-label'),
+        variableValue: document.getElementById('variable-value'),
+        variableDescription: document.getElementById('variable-description'),
+        variablesList: document.getElementById('variables-list'),
+        listForm: document.getElementById('list-form'),
+        listKey: document.getElementById('list-key'),
+        listLabel: document.getElementById('list-label'),
+        listOptions: document.getElementById('list-options'),
+        listDescription: document.getElementById('list-description'),
+        lists: document.getElementById('lists'),
+        jsonEditor: document.getElementById('json-editor'),
+        saveJson: document.getElementById('save-json')
+      };
+      function resetVariableForm() {
+        editingVariableKey = null;
+        elements.variableKey.value = '';
+        elements.variableLabel.value = '';
+        elements.variableValue.value = '';
+        elements.variableDescription.value = '';
+      }
+
+      function resetListForm() {
+        editingListKey = null;
+        elements.listKey.value = '';
+        elements.listLabel.value = '';
+        elements.listOptions.value = '';
+        elements.listDescription.value = '';
+      }
+
+      function renderVariables() {
+        elements.variablesList.innerHTML = '';
+        const variables = currentConfig?.sharedVariables || [];
+        if (variables.length === 0) {
+          const empty = document.createElement('div');
+          empty.textContent = 'No variables defined yet.';
+          empty.style.color = 'var(--vscode-descriptionForeground)';
+          elements.variablesList.appendChild(empty);
+          return;
+        }
+        variables.forEach(variable => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <div class="card-title">${variable.key}</div>
+            <div class="card-description">${variable.label || ''}</div>
+            <div class="card-description">Value: ${variable.value}</div>
+            ${variable.description ? `<div class="card-description">${variable.description}</div>` : ''}
+          `;
+          const actions = document.createElement('div');
+          actions.className = 'card-actions';
+          const editButton = document.createElement('button');
+          editButton.type = 'button';
+          editButton.textContent = 'Edit';
+          editButton.className = 'secondary-button';
+          editButton.addEventListener('click', () => {
+            editingVariableKey = variable.key;
+            elements.variableKey.value = variable.key;
+            elements.variableLabel.value = variable.label || '';
+            elements.variableValue.value = variable.value || '';
+            elements.variableDescription.value = variable.description || '';
+          });
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.textContent = 'Delete';
+          deleteButton.className = 'danger-button';
+          deleteButton.addEventListener('click', () => {
+            vscode.postMessage({ type: 'deleteSharedVariable', key: variable.key });
+          });
+          actions.appendChild(editButton);
+          actions.appendChild(deleteButton);
+          card.appendChild(actions);
+          elements.variablesList.appendChild(card);
+        });
+      }
+
+      function renderLists() {
+        elements.lists.innerHTML = '';
+        const lists = currentConfig?.sharedLists || [];
+        if (lists.length === 0) {
+          const empty = document.createElement('div');
+          empty.textContent = 'No lists defined yet.';
+          empty.style.color = 'var(--vscode-descriptionForeground)';
+          elements.lists.appendChild(empty);
+          return;
+        }
+        lists.forEach(list => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <div class="card-title">${list.key}</div>
+            <div class="card-description">${list.label || ''}</div>
+            <div class="card-description">Options: ${list.options.join(', ')}</div>
+            ${list.description ? `<div class="card-description">${list.description}</div>` : ''}
+          `;
+          const actions = document.createElement('div');
+          actions.className = 'card-actions';
+          const editButton = document.createElement('button');
+          editButton.type = 'button';
+          editButton.textContent = 'Edit';
+          editButton.className = 'secondary-button';
+          editButton.addEventListener('click', () => {
+            editingListKey = list.key;
+            elements.listKey.value = list.key;
+            elements.listLabel.value = list.label || '';
+            elements.listOptions.value = list.options.join(', ');
+            elements.listDescription.value = list.description || '';
+          });
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.textContent = 'Delete';
+          deleteButton.className = 'danger-button';
+          deleteButton.addEventListener('click', () => {
+            vscode.postMessage({ type: 'deleteSharedList', key: list.key });
+          });
+          actions.appendChild(editButton);
+          actions.appendChild(deleteButton);
+          card.appendChild(actions);
+          elements.lists.appendChild(card);
+        });
+      }
+
+      function loadJsonEditor() {
+        if (!currentConfig) {
+          elements.jsonEditor.value = '';
+          return;
+        }
+        elements.jsonEditor.value = JSON.stringify(currentConfig, null, 2);
+      }
+      function handleVariableSubmit(event) {
+        event.preventDefault();
+        const variable = {
+          key: elements.variableKey.value.trim(),
+          label: elements.variableLabel.value.trim() || undefined,
+          value: elements.variableValue.value.trim(),
+          description: elements.variableDescription.value.trim() || undefined
+        };
+        if (!variable.key || !variable.value) {
+          return;
+        }
+        vscode.postMessage({ type: 'saveSharedVariable', variable });
+        resetVariableForm();
+      }
+
+      function handleListSubmit(event) {
+        event.preventDefault();
+        const list = {
+          key: elements.listKey.value.trim(),
+          label: elements.listLabel.value.trim() || undefined,
+          options: elements.listOptions.value.split(',').map(item => item.trim()).filter(Boolean),
+          description: elements.listDescription.value.trim() || undefined
+        };
+        if (!list.key || list.options.length === 0) {
+          return;
+        }
+        vscode.postMessage({ type: 'saveSharedList', list });
+        resetListForm();
+      }
+
+      function handleSaveJson() {
+        vscode.postMessage({ type: 'saveConfig', configJson: elements.jsonEditor.value });
+      }
+
+      function handleMessage(event) {
+        const message = event.data;
+        if (message.type === 'config') {
+          currentConfig = message.config;
+          renderVariables();
+          renderLists();
+          loadJsonEditor();
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        elements.variableForm.addEventListener('submit', handleVariableSubmit);
+        elements.listForm.addEventListener('submit', handleListSubmit);
+        elements.saveJson.addEventListener('click', handleSaveJson);
+        vscode.postMessage({ type: 'ready' });
+      });
+
+      window.addEventListener('message', handleMessage);
+    </script>
+  </body>
+</html>

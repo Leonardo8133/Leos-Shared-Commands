@@ -20,7 +20,7 @@ export interface Command {
   label: string;
   command: string;
   terminal: TerminalConfig;
-  variables?: Variable[];
+  variables?: CommandVariable[];
   description?: string;
   icon?: string;
 }
@@ -33,13 +33,11 @@ export interface TerminalConfig {
   cwd?: string;
 }
 
-export interface Variable {
+export interface CommandVariable {
   key: string;
-  label: string;
-  type: 'input' | 'quickpick' | 'file' | 'folder' | 'environment';
-  options?: string[];
-  remember?: boolean;
-  defaultValue?: string;
+  label?: string;
+  type: 'fixed' | 'list';
+  description?: string;
 }
 
 

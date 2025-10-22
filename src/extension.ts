@@ -24,6 +24,15 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Set tree provider in executor for icon updates
     commandExecutor.setTreeProvider(treeProvider);
+    commandExecutor.setWebviewManager(webviewManager);
+    webviewManager.setTreeProvider(treeProvider);
+
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    statusBarItem.text = '$(rocket) Commands';
+    statusBarItem.tooltip = 'Run a saved command';
+    statusBarItem.command = 'commandManager.quickRun';
+    statusBarItem.show();
+    context.subscriptions.push(statusBarItem);
 
     // Register commands
     const runCommand = vscode.commands.registerCommand('commandManager.runCommand', async (item: CommandTreeItem) => {
@@ -44,7 +53,10 @@ export function activate(context: vscode.ExtensionContext) {
         if (item && item.isCommand()) {
             const command = item.getCommand();
             if (command) {
-                webviewManager.showCommandEditor(command);
+                webviewManager.showCommandEditor(command, {
+                    folderPath: item.getFolderPath(),
+                    commandIndex: item.getCommandIndex()
+                });
             }
         } else {
             webviewManager.showCommandEditor();
@@ -52,43 +64,27 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const newCommand = vscode.commands.registerCommand('commandManager.newCommand', async (item?: CommandTreeItem) => {
-        webviewManager.showCommandEditor();
+        let contextInfo: { folderPath: number[] } | undefined;
+        if (item) {
+            if (item.isFolder()) {
+                contextInfo = { folderPath: item.getFolderPath() };
+            } else if (item.isCommand() && item.parent && item.parent.isFolder()) {
+                contextInfo = { folderPath: item.parent.getFolderPath() };
+            }
+        }
+        webviewManager.showCommandEditor(undefined, contextInfo);
     });
 
     const newFolder = vscode.commands.registerCommand('commandManager.newFolder', async (item?: CommandTreeItem) => {
-        const folderName = await vscode.window.showInputBox({
-            prompt: 'Enter folder name',
-            placeHolder: 'New Folder'
-        });
-
-        if (folderName) {
-            try {
-                const config = configManager.getConfig();
-                const newFolder = {
-                    name: folderName,
-                    commands: [],
-                    subfolders: []
-                };
-
-                if (item && item.isFolder()) {
-                    const folder = item.getFolder();
-                    if (folder) {
-                        if (!folder.subfolders) {
-                            folder.subfolders = [];
-                        }
-                        folder.subfolders.push(newFolder);
-                    }
-                } else {
-                    config.folders.push(newFolder);
-                }
-
-                await configManager.saveConfig(config);
-                treeProvider.refresh();
-                vscode.window.showInformationMessage(`Folder "${folderName}" created successfully`);
-            } catch (error) {
-                vscode.window.showErrorMessage(`Failed to create folder: ${error}`);
+        let contextInfo: { parentPath?: number[] } | undefined;
+        if (item) {
+            if (item.isFolder()) {
+                contextInfo = { parentPath: item.getFolderPath() };
+            } else if (item.parent && item.parent.isFolder()) {
+                contextInfo = { parentPath: item.parent.getFolderPath() };
             }
         }
+        webviewManager.showFolderEditor(undefined, contextInfo);
     });
 
     const duplicateCommand = vscode.commands.registerCommand('commandManager.duplicateCommand', async (item: CommandTreeItem) => {
@@ -100,7 +96,43 @@ export function activate(context: vscode.ExtensionContext) {
                     id: `${command.id}-copy-${Date.now()}`,
                     label: `${command.label} (Copy)`
                 };
-                webviewManager.showCommandEditor(newCommand);
+                webviewManager.showCommandEditor(newCommand, {
+                    folderPath: item.getFolderPath()
+                });
+            }
+        }
+    });
+
+    const editFolder = vscode.commands.registerCommand('commandManager.editFolder', async (item: CommandTreeItem) => {
+        if (item && item.isFolder()) {
+            const folder = item.getFolder();
+            if (folder) {
+                webviewManager.showFolderEditor(folder, { path: item.getFolderPath() });
+            }
+        }
+    });
+
+    const quickRun = vscode.commands.registerCommand('commandManager.quickRun', async () => {
+        const commands = await treeProvider.getAllCommands();
+        if (commands.length === 0) {
+            vscode.window.showInformationMessage('No commands configured yet. Create one from the Command Manager view.');
+            return;
+        }
+
+        const selection = await vscode.window.showQuickPick(commands.map(command => ({
+            label: command.label,
+            description: command.description || '',
+            detail: command.command,
+            command
+        })), {
+            placeHolder: 'Select a command to run'
+        });
+
+        if (selection?.command) {
+            try {
+                await commandExecutor.executeCommandWithProgress(selection.command);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to execute command: ${error}`);
             }
         }
     });
@@ -149,19 +181,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 
     // Webview commands
-    const openWebview = vscode.commands.registerCommand('commandManager.openWebview', () => {
-        webviewManager.showWebview();
-    });
-
-    const openCommandEditor = vscode.commands.registerCommand('commandManager.openCommandEditor', (command?: any) => {
-        webviewManager.showCommandEditor(command);
-    });
-
-    // Variable management commands
-    const manageVariables = vscode.commands.registerCommand('commandManager.manageVariables', () => {
-        webviewManager.showVariableManager();
-    });
-
     const openConfiguration = vscode.commands.registerCommand('commandManager.openConfiguration', () => {
         webviewManager.showConfigurationManager();
     });
@@ -267,14 +286,13 @@ export function activate(context: vscode.ExtensionContext) {
         editCommand,
         newCommand,
         newFolder,
+        editFolder,
         duplicateCommand,
         deleteItem,
         openConfig,
         refresh,
-        openWebview,
-        openCommandEditor,
-        manageVariables,
         openConfiguration,
+        quickRun,
         importCommands,
         exportCommands
     );
