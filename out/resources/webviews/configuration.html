@@ -248,10 +248,13 @@
         </div>
         <textarea id="json-editor" class="json-editor"></textarea>
         <div class="json-actions">
+          <button type="button" id="export-config" class="secondary-button">Export Configuration</button>
+          <button type="button" id="import-config" class="secondary-button">Import Configuration</button>
           <button type="button" id="save-json" class="primary-button">Save configuration</button>
         </div>
       </div>
     </div>
+    <input type="file" id="import-file-input" accept=".json" style="display: none;" />
     <script nonce="{{nonce}}">
       const vscode = acquireVsCodeApi();
       let currentConfig = null;
@@ -260,7 +263,10 @@
         variablesContainer: document.getElementById('variables-container'),
         addVariable: document.getElementById('add-variable'),
         jsonEditor: document.getElementById('json-editor'),
-        saveJson: document.getElementById('save-json')
+        saveJson: document.getElementById('save-json'),
+        exportConfig: document.getElementById('export-config'),
+        importConfig: document.getElementById('import-config'),
+        importFileInput: document.getElementById('import-file-input')
       };
       function slugify(value) {
         return value
@@ -468,6 +474,70 @@
         vscode.postMessage({ type: 'saveConfig', configJson: elements.jsonEditor.value });
       }
 
+      function handleExportConfig() {
+        console.log('Export button clicked, currentConfig:', currentConfig);
+        
+        if (!currentConfig) {
+          console.log('No currentConfig available, showing error');
+          vscode.postMessage({ type: 'error', message: 'No configuration to export' });
+          return;
+        }
+        
+        try {
+          const configJson = JSON.stringify(currentConfig, null, 2);
+          const blob = new Blob([configJson], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `command-manager-config-${new Date().toISOString().split('T')[0]}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          console.log('Export completed successfully');
+        } catch (error) {
+          console.error('Export error:', error);
+          vscode.postMessage({ type: 'error', message: 'Failed to export configuration: ' + error.message });
+        }
+      }
+
+      function handleImportConfig() {
+        elements.importFileInput.click();
+      }
+
+      function handleFileImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const importedConfig = JSON.parse(e.target.result);
+            
+            // Validate the imported configuration
+            if (!importedConfig.folders || !Array.isArray(importedConfig.folders)) {
+              vscode.postMessage({ type: 'error', message: 'Invalid configuration file: missing or invalid folders array' });
+              return;
+            }
+            
+            // Update current config and UI
+            currentConfig = importedConfig;
+            renderVariables();
+            loadJsonEditor();
+            
+            vscode.postMessage({ type: 'info', message: 'Configuration imported successfully. Click "Save configuration" to apply changes.' });
+          } catch (error) {
+            vscode.postMessage({ type: 'error', message: 'Invalid JSON file: ' + error.message });
+          }
+        };
+        reader.readAsText(file);
+        
+        // Reset file input
+        event.target.value = '';
+      }
+
       function handleMessage(event) {
         const message = event.data;
         if (message.type === 'config') {
@@ -478,10 +548,20 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, setting up event listeners');
+        console.log('exportConfig element:', elements.exportConfig);
+        
         elements.addVariable.addEventListener('click', () => {
           addVariableRow();
         });
         elements.saveJson.addEventListener('click', handleSaveJson);
+        elements.exportConfig.addEventListener('click', () => {
+          console.log('Export button clicked!');
+          alert('Export button clicked!'); // Temporary debug
+          handleExportConfig();
+        });
+        elements.importConfig.addEventListener('click', handleImportConfig);
+        elements.importFileInput.addEventListener('change', handleFileImport);
         vscode.postMessage({ type: 'ready' });
       });
 

@@ -172,6 +172,12 @@ export class WebviewManager {
         case 'saveConfig':
           await this.saveConfigFromJson(message.configJson);
           break;
+        case 'error':
+          vscode.window.showErrorMessage(message.message);
+          break;
+        case 'info':
+          vscode.window.showInformationMessage(message.message);
+          break;
         case 'cancel':
           this.configPanel?.dispose();
           break;
@@ -541,6 +547,7 @@ export class WebviewManager {
 
     this.replaceFolderAtPath(current.subfolders, rest, folder);
   }
+
 
   private getNonce(): string {
     let text = '';

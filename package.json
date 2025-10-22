@@ -123,6 +123,19 @@
       {
         "command": "documentationHub.openSection",
         "title": "Documentation Hub: Open Section"
+      },
+      {
+        "command": "documentationHub.hideItem",
+        "title": "Documentation Hub: Hide Item"
+      },
+      {
+        "command": "documentationHub.unhideItem",
+        "title": "Documentation Hub: Unhide Item"
+      },
+      {
+        "command": "documentationHub.unhideAll",
+        "title": "Documentation Hub: Unhide All",
+        "icon": "$(eye)"
       }
     ],
     "menus": {
@@ -161,6 +174,11 @@
           "command": "documentationHub.refresh",
           "when": "view == documentationHubTree",
           "group": "navigation@3"
+        },
+        {
+          "command": "documentationHub.unhideAll",
+          "when": "view == documentationHubTree",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -223,6 +241,16 @@
           "command": "documentationHub.extractCommands",
           "when": "view == documentationHubTree && viewItem == documentationReadme",
           "group": "navigation@3"
+        },
+        {
+          "command": "documentationHub.hideItem",
+          "when": "view == documentationHubTree && (viewItem == documentationFolder || viewItem == documentationReadme)",
+          "group": "4_hide@1"
+        },
+        {
+          "command": "documentationHub.unhideItem",
+          "when": "view == documentationHubTree && (viewItem == documentationFolder || viewItem == documentationReadme)",
+          "group": "4_hide@2"
         }
       ]
     },

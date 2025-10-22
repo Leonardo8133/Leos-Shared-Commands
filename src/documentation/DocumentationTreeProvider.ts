@@ -21,6 +21,7 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
   private searchQuery = '';
   private viewMode: ViewMode = 'tree';
   private watcher?: vscode.FileSystemWatcher;
+  private hiddenItems: Set<string> = new Set();
 
   constructor(private readonly configManager: ConfigManager) {
     void this.initialize();
@@ -97,10 +98,11 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
 
       const fileEntries = this.getFilteredMarkdownFiles();
       if (this.viewMode === 'flat') {
-        items.push(...fileEntries.map(entry => this.createFileItem(entry)));
+        const fileItems = fileEntries.map(entry => this.createFileItem(entry));
+        items.push(...fileItems.filter(item => !this.isHidden(item)));
       } else {
         const tree = this.buildFolderTree(fileEntries);
-        items.push(...tree);
+        items.push(...tree.filter(item => !this.isHidden(item)));
       }
 
       if (items.length === 1) {
@@ -111,7 +113,8 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
     }
 
     if (element.type === 'folder') {
-      return element.children ?? [];
+      const children = element.children ?? [];
+      return children.filter(child => !this.isHidden(child));
     }
 
     return [];
@@ -198,21 +201,28 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
         const item = new DocumentationTreeItem('folder', folder.name, vscode.TreeItemCollapsibleState.Collapsed, undefined, children);
         item.iconPath = new vscode.ThemeIcon('folder');
         item.description = folder.path;
-        folderItems.push(item);
+        
+        // Only add folder if it's not hidden and has visible children
+        const visibleChildren = children.filter(child => !this.isHidden(child));
+        if (!this.isHidden(item) && visibleChildren.length > 0) {
+          folderItems.push(item);
+        }
       }
 
       return folderItems;
     };
 
     const rootItems = [...buildItems(root), ...root.files.map(file => this.createFileItem(file))];
-    if (!rootItems.length) {
+    const visibleRootItems = rootItems.filter(item => !this.isHidden(item));
+    
+    if (!visibleRootItems.length) {
       const emptyItem = new DocumentationTreeItem('search', 'No documentation found', vscode.TreeItemCollapsibleState.None);
       emptyItem.iconPath = new vscode.ThemeIcon('book');
       emptyItem.command = undefined;
       return [emptyItem];
     }
 
-    return rootItems;
+    return visibleRootItems;
   }
 
   private getFilteredMarkdownFiles(): MarkdownFileEntry[] {
@@ -385,6 +395,37 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
         keepOpen: true
       }
     };
+  }
+
+  public hideItem(item: DocumentationTreeItem): void {
+    const key = this.getItemKey(item);
+    this.hiddenItems.add(key);
+    this.refresh();
+  }
+
+  public unhideItem(item: DocumentationTreeItem): void {
+    const key = this.getItemKey(item);
+    this.hiddenItems.delete(key);
+    this.refresh();
+  }
+
+  public unhideAll(): void {
+    this.hiddenItems.clear();
+    this.refresh();
+  }
+
+  public isHidden(item: DocumentationTreeItem): boolean {
+    const key = this.getItemKey(item);
+    return this.hiddenItems.has(key);
+  }
+
+  private getItemKey(item: DocumentationTreeItem): string {
+    if (item.type === 'file' && item.metadata) {
+      return `file:${item.metadata.relativePath}`;
+    } else if (item.type === 'folder') {
+      return `folder:${item.labelText}`;
+    }
+    return `search:${item.labelText}`;
   }
 
   public dispose(): void {

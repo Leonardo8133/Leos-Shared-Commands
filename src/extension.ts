@@ -376,6 +376,22 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    const hideDocumentationItem = vscode.commands.registerCommand('documentationHub.hideItem', async (item: any) => {
+        if (item && (item.type === 'folder' || item.type === 'file')) {
+            documentationProvider.hideItem(item);
+        }
+    });
+
+    const unhideDocumentationItem = vscode.commands.registerCommand('documentationHub.unhideItem', async (item: any) => {
+        if (item && (item.type === 'folder' || item.type === 'file')) {
+            documentationProvider.unhideItem(item);
+        }
+    });
+
+    const unhideAllDocumentation = vscode.commands.registerCommand('documentationHub.unhideAll', () => {
+        documentationProvider.unhideAll();
+    });
+
     context.subscriptions.push(
         openDocumentation,
         copyDocumentationPath,
@@ -383,7 +399,10 @@ export function activate(context: vscode.ExtensionContext) {
         searchDocumentation,
         toggleDocumentationViewMode,
         refreshDocumentation,
-        openDocumentationSection
+        openDocumentationSection,
+        hideDocumentationItem,
+        unhideDocumentationItem,
+        unhideAllDocumentation
     );
 
     // Show welcome message
