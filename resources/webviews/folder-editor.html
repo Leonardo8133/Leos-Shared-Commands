@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'nonce-{{nonce}}'; font-src https://cdn.jsdelivr.net; img-src {{cspSource}} data:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css" />
+    <title>Folder Editor</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background: var(--vscode-editor-background);
+      }
+      .container {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 16px;
+      }
+      form {
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        font-size: 12px;
+      }
+      .icon-preview {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+      }
+      .icon-preview .codicon {
+        font-size: 16px;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      button {
+        border: none;
+        border-radius: 4px;
+        padding: 6px 16px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .primary-button {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+      .primary-button:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+      .secondary-button {
+        background: transparent;
+        color: var(--vscode-button-foreground);
+        border: 1px solid var(--vscode-button-border, var(--vscode-button-background));
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 id="title">Folder</h1>
+      <form id="folder-form">
+        <div>
+          <label for="folder-name">Label</label>
+          <input id="folder-name" type="text" required placeholder="Folder label" />
+        </div>
+        <div>
+          <label for="folder-icon">Icon</label>
+          <select id="folder-icon"></select>
+          <div class="icon-preview" id="icon-preview" style="display: none;">
+            <span class="codicon" id="icon-preview-symbol"></span>
+            <span id="icon-preview-text"></span>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="cancel" class="secondary-button">Cancel</button>
+          <button type="submit" class="primary-button">Save folder</button>
+        </div>
+      </form>
+    </div>
+    <script nonce="{{nonce}}">
+      const vscode = acquireVsCodeApi();
+      const iconOptions = [
+        { value: '', label: 'No icon' },
+        { value: '$(folder)', label: 'Folder' },
+        { value: '$(library)', label: 'Library' },
+        { value: '$(repo)', label: 'Repository' },
+        { value: '$(archive)', label: 'Archive' },
+        { value: '$(briefcase)', label: 'Briefcase' },
+        { value: '$(organization)', label: 'Organization' }
+      ];
+
+      let currentFolder = null;
+
+      const elements = {
+        title: document.getElementById('title'),
+        form: document.getElementById('folder-form'),
+        name: document.getElementById('folder-name'),
+        icon: document.getElementById('folder-icon'),
+        cancel: document.getElementById('cancel'),
+        iconPreview: document.getElementById('icon-preview'),
+        iconSymbol: document.getElementById('icon-preview-symbol'),
+        iconText: document.getElementById('icon-preview-text')
+      };
+
+      function populateIconSelect() {
+        elements.icon.innerHTML = '';
+        iconOptions.forEach(option => {
+          const opt = document.createElement('option');
+          opt.value = option.value;
+          opt.textContent = option.label;
+          elements.icon.appendChild(opt);
+        });
+      }
+
+      function updateIconPreview() {
+        const value = elements.icon.value;
+        if (!value) {
+          elements.iconPreview.style.display = 'none';
+          return;
+        }
+        const iconName = value.replace('$(', '').replace(')', '');
+        const label = iconOptions.find(opt => opt.value === value)?.label || iconName;
+        elements.iconPreview.style.display = 'inline-flex';
+        elements.iconSymbol.className = `codicon codicon-${iconName}`;
+        elements.iconText.textContent = label;
+      }
+
+      function populateForm(folder) {
+        currentFolder = folder || null;
+        elements.title.textContent = folder ? `Edit ${folder.name}` : 'New folder';
+        elements.name.value = folder?.name || '';
+        elements.icon.value = folder?.icon || '';
+        updateIconPreview();
+      }
+
+      function collectFolder() {
+        return {
+          name: elements.name.value.trim(),
+          icon: elements.icon.value || undefined,
+          commands: currentFolder?.commands || [],
+          subfolders: currentFolder?.subfolders || []
+        };
+      }
+
+      function handleSubmit(event) {
+        event.preventDefault();
+        const folder = collectFolder();
+        if (!folder.name) {
+          return;
+        }
+        vscode.postMessage({ type: 'saveFolder', folder, context: window.currentContext });
+      }
+
+      function handleCancel() {
+        vscode.postMessage({ type: 'cancel' });
+      }
+
+      function handleMessage(event) {
+        const message = event.data;
+        if (message.type === 'init') {
+          window.currentContext = message.context || null;
+          populateForm(message.folder || null);
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        populateIconSelect();
+        elements.form.addEventListener('submit', handleSubmit);
+        elements.cancel.addEventListener('click', handleCancel);
+        elements.icon.addEventListener('change', updateIconPreview);
+        vscode.postMessage({ type: 'ready' });
+      });
+
+      window.addEventListener('message', handleMessage);
+    </script>
+  </body>
+</html>

@@ -7,7 +7,9 @@ export class CommandTreeItem extends vscode.TreeItem {
   constructor(
     public readonly item: Command | Folder,
     public readonly type: 'command' | 'folder',
-    public readonly parent?: CommandTreeItem
+    public readonly parent?: CommandTreeItem,
+    public readonly path: number[] = [],
+    public readonly commandIndex?: number
   ) {
     super(
       type === 'folder' ? (item as Folder).name : (item as Command).label,
@@ -109,5 +111,13 @@ export class CommandTreeItem extends vscode.TreeItem {
 
   public isFolder(): boolean {
     return this.type === 'folder';
+  }
+
+  public getFolderPath(): number[] {
+    return [...this.path];
+  }
+
+  public getCommandIndex(): number | undefined {
+    return this.commandIndex;
   }
 }

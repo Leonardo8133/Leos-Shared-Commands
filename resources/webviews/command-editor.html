@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'nonce-{{nonce}}'; font-src https://cdn.jsdelivr.net; img-src {{cspSource}} data:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css" />
+    <title>Command Editor</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background: var(--vscode-editor-background);
+      }
+      .container {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .section {
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        background: var(--vscode-editor-background);
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .field label {
+        display: block;
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        margin-bottom: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        padding: 6px 7px;
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        font-size: 12px;
+      }
+      textarea {
+        font-family: var(--vscode-editor-font-family, monospace);
+        min-height: 72px;
+        resize: vertical;
+      }
+      .command-preview {
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 4px;
+        padding: 8px;
+        background: var(--vscode-editor-background);
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 12px;
+        min-height: 64px;
+        white-space: pre-wrap;
+        line-height: 1.4;
+      }
+      .variable-tag {
+        color: var(--vscode-textLink-foreground);
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .variable-tag--missing {
+        color: var(--vscode-errorForeground);
+        text-decoration: underline dotted;
+      }
+      .variables-table {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) 110px 28px;
+        gap: 6px;
+        align-items: center;
+      }
+      .variable-row input,
+      .variable-row select {
+        padding: 4px 6px;
+        font-size: 11px;
+      }
+      .variables-table .header {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--vscode-descriptionForeground);
+      }
+      .variables-table .remove {
+        background: transparent;
+        border: none;
+        color: var(--vscode-errorForeground);
+        cursor: pointer;
+        padding: 0;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .primary-button,
+      .secondary-button {
+        border: none;
+        border-radius: 4px;
+        padding: 5px 14px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .primary-button {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+      .primary-button:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+      .secondary-button {
+        background: transparent;
+        color: var(--vscode-button-foreground);
+        border: 1px solid var(--vscode-button-border, var(--vscode-button-background));
+      }
+      .icon-preview {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+      }
+      .icon-preview .codicon {
+        font-size: 16px;
+      }
+      .checkbox-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .checkbox-row label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        text-transform: none;
+        font-size: 12px;
+        letter-spacing: normal;
+      }
+      .variable-dropdown {
+        position: absolute;
+        top: 0;
+        left: 0;
+        min-width: 220px;
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        background: var(--vscode-editor-background);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        display: none;
+        z-index: 1000;
+      }
+      .variable-dropdown button {
+        display: flex;
+        width: 100%;
+        padding: 6px 10px;
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        text-align: left;
+      }
+      .variable-dropdown button:hover {
+        background: var(--vscode-list-hoverBackground);
+      }
+      .variable-dropdown .type {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 id="editor-title">Command</h1>
+      <form id="command-form" class="section">
+        <div class="grid">
+          <div class="field">
+            <label for="command-label">Label</label>
+            <input id="command-label" type="text" required placeholder="Friendly name" />
+          </div>
+          <div class="field">
+            <label for="command-id">Identifier</label>
+            <input id="command-id" type="text" required placeholder="unique-id" />
+          </div>
+          <div class="field">
+            <label for="command-icon">Icon</label>
+            <select id="command-icon"></select>
+            <div class="icon-preview" id="icon-preview" style="display: none;">
+              <span class="codicon" id="icon-preview-symbol"></span>
+              <span id="icon-preview-text"></span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="command-description">Description</label>
+            <input id="command-description" type="text" placeholder="Optional description" />
+          </div>
+        </div>
+        <div class="field" style="position: relative;">
+          <label for="command-command">Command</label>
+          <textarea id="command-command" placeholder="Type the command. Use $VARIABLE to insert placeholders."></textarea>
+          <div id="variable-dropdown" class="variable-dropdown"></div>
+        </div>
+        <div class="command-preview" id="command-preview"></div>
+        <div class="section" style="margin: 0;">
+          <h2 class="section-title">Terminal</h2>
+          <div class="grid">
+            <div class="field">
+              <label for="terminal-type">Type</label>
+              <select id="terminal-type">
+                <option value="vscode-current">VS Code - Current terminal</option>
+                <option value="vscode-new">VS Code - Dedicated terminal</option>
+                <option value="external-cmd">External Command Prompt</option>
+                <option value="external-powershell">External PowerShell</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="terminal-name">Terminal name</label>
+              <input id="terminal-name" type="text" placeholder="Optional terminal name" />
+            </div>
+            <div class="field">
+              <label for="terminal-cwd">Working directory</label>
+              <input id="terminal-cwd" type="text" placeholder="Optional path" />
+            </div>
+          </div>
+          <div class="checkbox-row">
+            <label><input type="checkbox" id="terminal-keep-open" checked />Keep terminal open</label>
+            <label><input type="checkbox" id="terminal-clear" />Clear before running</label>
+          </div>
+        </div>
+        <div class="section" style="margin: 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <h2 class="section-title">Variables</h2>
+            <button id="add-variable" type="button" class="secondary-button">Add variable</button>
+          </div>
+          <div class="variables-table" id="variables-header">
+            <div class="header">Key</div>
+            <div class="header">Label</div>
+            <div class="header">Type</div>
+            <div></div>
+          </div>
+          <div class="variables-table" id="variables-container"></div>
+        </div>
+        <div class="actions">
+          <button type="button" id="cancel-button" class="secondary-button">Cancel</button>
+          <button type="submit" class="primary-button">Save command</button>
+        </div>
+      </form>
+    </div>
+    <script nonce="{{nonce}}">
+      const vscode = acquireVsCodeApi();
+      let currentCommand = null;
+      let currentContext = null;
+      let availableVariables = [];
+      let dropdownAnchor = 0;
+
+      const iconOptions = [
+        { value: '', label: 'No icon' },
+        { value: '$(play)', label: 'Play' },
+        { value: '$(beaker)', label: 'Beaker' },
+        { value: '$(terminal)', label: 'Terminal' },
+        { value: '$(rocket)', label: 'Rocket' },
+        { value: '$(zap)', label: 'Zap' },
+        { value: '$(repo-push)', label: 'Push' },
+        { value: '$(tools)', label: 'Tools' },
+        { value: '$(gear)', label: 'Settings' },
+        { value: '$(database)', label: 'Database' },
+        { value: '$(debug)', label: 'Debug' },
+        { value: '$(triangle-right)', label: 'Run' },
+        { value: '$(watch)', label: 'Watch' }
+      ];
+
+      const elements = {
+        title: document.getElementById('editor-title'),
+        label: document.getElementById('command-label'),
+        id: document.getElementById('command-id'),
+        icon: document.getElementById('command-icon'),
+        iconPreview: document.getElementById('icon-preview'),
+        iconSymbol: document.getElementById('icon-preview-symbol'),
+        iconText: document.getElementById('icon-preview-text'),
+        description: document.getElementById('command-description'),
+        command: document.getElementById('command-command'),
+        preview: document.getElementById('command-preview'),
+        dropdown: document.getElementById('variable-dropdown'),
+        terminalType: document.getElementById('terminal-type'),
+        terminalName: document.getElementById('terminal-name'),
+        terminalCwd: document.getElementById('terminal-cwd'),
+        keepOpen: document.getElementById('terminal-keep-open'),
+        clearBeforeRun: document.getElementById('terminal-clear'),
+        variablesContainer: document.getElementById('variables-container'),
+        form: document.getElementById('command-form'),
+        cancel: document.getElementById('cancel-button'),
+        addVariable: document.getElementById('add-variable')
+      };
+
+      function populateIconSelect() {
+        elements.icon.innerHTML = '';
+        iconOptions.forEach(option => {
+          const opt = document.createElement('option');
+          opt.value = option.value;
+          opt.textContent = option.label;
+          elements.icon.appendChild(opt);
+        });
+      }
+
+      function updateIconPreview() {
+        const value = elements.icon.value;
+        if (!value) {
+          elements.iconPreview.style.display = 'none';
+          elements.iconSymbol.textContent = '';
+          elements.iconText.textContent = '';
+          return;
+        }
+        const iconName = value.replace('$(', '').replace(')', '');
+        elements.iconPreview.style.display = 'inline-flex';
+        elements.iconSymbol.className = `codicon codicon-${iconName}`;
+        const label = iconOptions.find(opt => opt.value === value)?.label || iconName;
+        elements.iconText.textContent = label;
+      }
+
+      function slugify(value) {
+        return value
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-');
+      }
+
+      function handleLabelChange() {
+        const currentId = elements.id.value.trim();
+        const generated = slugify(elements.label.value);
+        if (!currentId || elements.id.dataset.generated === 'true') {
+          elements.id.value = generated;
+          elements.id.dataset.generated = 'true';
+        }
+      }
+
+      function handleIdInput() {
+        elements.id.dataset.generated = 'false';
+      }
+      function renderVariables(variables) {
+        elements.variablesContainer.innerHTML = '';
+        variables.forEach(variable => addVariableRow(variable));
+      }
+
+      function addVariableRow(variable = { key: '', label: '', type: 'fixed' }) {
+        const row = document.createElement('div');
+        row.className = 'variables-table variable-row';
+        row.innerHTML = `
+          <input type="text" class="variable-key" placeholder="VARIABLE_KEY" value="${variable.key || ''}" />
+          <input type="text" class="variable-label" placeholder="Visible label" value="${variable.label || ''}" />
+          <select class="variable-type">
+            <option value="fixed" ${variable.type === 'fixed' ? 'selected' : ''}>Fixed</option>
+            <option value="list" ${variable.type === 'list' ? 'selected' : ''}>List</option>
+          </select>
+          <button type="button" class="remove" title="Remove variable">×</button>
+        `;
+        row.querySelector('.remove').addEventListener('click', () => {
+          row.remove();
+          updatePreview();
+        });
+        ['input', 'change'].forEach(eventName => {
+          row.querySelectorAll('input, select').forEach(el => {
+            el.addEventListener(eventName, () => updatePreview());
+          });
+        });
+        elements.variablesContainer.appendChild(row);
+      }
+
+      function collectVariables() {
+        const rows = Array.from(elements.variablesContainer.querySelectorAll('.variable-row'));
+        return rows
+          .map(row => ({
+            key: row.querySelector('.variable-key').value.trim(),
+            label: row.querySelector('.variable-label').value.trim(),
+            type: row.querySelector('.variable-type').value
+          }))
+          .filter(variable => variable.key);
+      }
+
+      function getVariableMetadata(key) {
+        const commandVariable = collectVariables().find(variable => variable.key === key);
+        const globalVariable = availableVariables.find(variable => variable.key === key);
+        const type = commandVariable?.type || globalVariable?.type || 'fixed';
+        const label = commandVariable?.label || globalVariable?.label || key;
+        const parts = [`Key: ${key}`, `Type: ${type}`];
+        if (label && label !== key) {
+          parts.push(`Label: ${label}`);
+        }
+        if (globalVariable) {
+          if (type === 'fixed' && globalVariable.value) {
+            parts.push(`Value: ${globalVariable.value}`);
+          }
+          if (type === 'list' && Array.isArray(globalVariable.options)) {
+            parts.push(`Options: ${globalVariable.options.join(', ')}`);
+          }
+          if (globalVariable.description) {
+            parts.push(globalVariable.description);
+          }
+        } else {
+          parts.push('Not configured in Global Variables');
+        }
+        return {
+          label,
+          type,
+          configured: Boolean(globalVariable),
+          tooltip: parts.join('\n')
+        };
+      }
+
+      function escapeHtml(value) {
+        return value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function updatePreview() {
+        const text = elements.command.value || '';
+        const escaped = escapeHtml(text);
+        const highlighted = escaped.replace(/\$([A-Za-z0-9_]+)/g, (_, key) => {
+          const metadata = getVariableMetadata(key);
+          const classes = ['variable-tag'];
+          if (!metadata.configured) {
+            classes.push('variable-tag--missing');
+          }
+          const title = metadata.tooltip.replace(/"/g, '&quot;');
+          return `<span class="${classes.join(' ')}" title="${title}">$${key}</span>`;
+        });
+        elements.preview.innerHTML = highlighted;
+      }
+      function showVariableDropdown() {
+        const rect = elements.command.getBoundingClientRect();
+        elements.dropdown.style.left = `${rect.left}px`;
+        elements.dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        elements.dropdown.style.display = 'block';
+        renderDropdownItems();
+        if (availableVariables.length === 0) {
+          vscode.postMessage({ type: 'requestGlobals' });
+        }
+      }
+
+      function hideVariableDropdown() {
+        elements.dropdown.style.display = 'none';
+      }
+
+      function getDropdownItems() {
+        const combined = new Map();
+
+        collectVariables().forEach(variable => {
+          combined.set(variable.key, {
+            key: variable.key,
+            label: variable.label,
+            type: variable.type,
+            source: 'command'
+          });
+        });
+
+        availableVariables.forEach(variable => {
+          const existing = combined.get(variable.key);
+          if (existing) {
+            combined.set(variable.key, {
+              ...existing,
+              label: existing.label || variable.label,
+              type: existing.type || variable.type,
+              source: 'command+global',
+              description: variable.description,
+              value: variable.value,
+              options: variable.options
+            });
+          } else {
+            combined.set(variable.key, {
+              key: variable.key,
+              label: variable.label,
+              type: variable.type,
+              source: 'global',
+              description: variable.description,
+              value: variable.value,
+              options: variable.options
+            });
+          }
+        });
+
+        return Array.from(combined.values()).sort((a, b) => a.key.localeCompare(b.key));
+      }
+
+      function renderDropdownItems() {
+        elements.dropdown.innerHTML = '';
+        const variables = getDropdownItems();
+        if (variables.length === 0) {
+          const placeholder = document.createElement('div');
+          placeholder.textContent = 'No variables available yet.';
+          placeholder.style.padding = '8px';
+          elements.dropdown.appendChild(placeholder);
+          return;
+        }
+        variables.forEach(variable => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          const typeLabel = variable.type === 'list' ? 'List' : 'Fixed';
+          const sourceLabel = variable.source === 'global' ? 'Global' : variable.source === 'command' ? 'Command' : 'Command · Global';
+          button.innerHTML = `
+            <span style="flex:1;">$${variable.key}</span>
+            <span class="type">${typeLabel}${variable.label ? ' · ' + variable.label : ''} (${sourceLabel})</span>
+          `;
+          button.addEventListener('click', () => {
+            insertVariable(variable.key);
+            hideVariableDropdown();
+          });
+          elements.dropdown.appendChild(button);
+        });
+      }
+
+      function insertVariable(key) {
+        const value = elements.command.value;
+        const start = elements.command.selectionStart;
+        const before = value.slice(0, start);
+        const after = value.slice(start);
+        const hasTrailingDollar = before.endsWith('$');
+        const prefix = hasTrailingDollar ? before.slice(0, -1) : before;
+        const insertion = `$${key}`;
+        elements.command.value = `${prefix}${insertion}${after}`;
+        const cursor = prefix.length + insertion.length;
+        elements.command.focus();
+        elements.command.setSelectionRange(cursor, cursor);
+        updatePreview();
+      }
+      function populateForm(command, context) {
+        currentCommand = command || null;
+        currentContext = context || null;
+        elements.title.textContent = command ? `Edit ${command.label}` : 'New command';
+        elements.label.value = command?.label || '';
+        elements.id.value = command?.id || '';
+        elements.id.dataset.generated = command ? 'false' : 'true';
+        elements.icon.value = command?.icon || '';
+        updateIconPreview();
+        elements.description.value = command?.description || '';
+        elements.command.value = command?.command || '';
+        elements.terminalType.value = command?.terminal?.type || 'vscode-new';
+        elements.terminalName.value = command?.terminal?.name || '';
+        elements.terminalCwd.value = command?.terminal?.cwd || '';
+        elements.keepOpen.checked = command?.terminal?.keepOpen !== false;
+        elements.clearBeforeRun.checked = command?.terminal?.clearBeforeRun || false;
+        renderVariables(command?.variables || []);
+        updatePreview();
+      }
+
+      function collectCommand() {
+        return {
+          id: elements.id.value.trim(),
+          label: elements.label.value.trim(),
+          description: elements.description.value.trim() || undefined,
+          icon: elements.icon.value || undefined,
+          command: elements.command.value,
+          terminal: {
+            type: elements.terminalType.value,
+            name: elements.terminalName.value.trim() || undefined,
+            cwd: elements.terminalCwd.value.trim() || undefined,
+            keepOpen: elements.keepOpen.checked,
+            clearBeforeRun: elements.clearBeforeRun.checked
+          },
+          variables: collectVariables()
+        };
+      }
+
+      function handleSubmit(event) {
+        event.preventDefault();
+        const command = collectCommand();
+        if (!command.id || !command.label || !command.command) {
+          vscode.postMessage({ type: 'error', message: 'Command requires id, label and command text.' });
+          return;
+        }
+        vscode.postMessage({ type: 'saveCommand', command, context: currentContext });
+      }
+
+      function handleCancel() {
+        vscode.postMessage({ type: 'cancel' });
+      }
+
+      function handleMessage(event) {
+        const message = event.data;
+        switch (message.type) {
+          case 'init':
+            availableVariables = message.variables || [];
+            populateForm(message.command, message.context);
+            break;
+          case 'variables':
+            availableVariables = message.variables || [];
+            renderDropdownItems();
+            updatePreview();
+            break;
+        }
+      }
+      function handleCommandInput(event) {
+        dropdownAnchor = elements.command.selectionStart;
+        const value = elements.command.value;
+        const char = value.charAt(dropdownAnchor - 1);
+        if (char === '$') {
+          showVariableDropdown();
+        } else if (elements.dropdown.style.display === 'block') {
+          hideVariableDropdown();
+        }
+        updatePreview();
+      }
+
+      function handleCommandKeydown(event) {
+        if (event.key === 'Escape' && elements.dropdown.style.display === 'block') {
+          hideVariableDropdown();
+          event.preventDefault();
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        populateIconSelect();
+        elements.form.addEventListener('submit', handleSubmit);
+        elements.cancel.addEventListener('click', handleCancel);
+        elements.icon.addEventListener('change', updateIconPreview);
+        elements.label.addEventListener('input', handleLabelChange);
+        elements.id.addEventListener('input', handleIdInput);
+        elements.command.addEventListener('input', handleCommandInput);
+        elements.command.addEventListener('keydown', handleCommandKeydown);
+        elements.addVariable.addEventListener('click', () => {
+          addVariableRow();
+        });
+        document.addEventListener('click', (event) => {
+          if (!elements.dropdown.contains(event.target) && event.target !== elements.command) {
+            hideVariableDropdown();
+          }
+        });
+        vscode.postMessage({ type: 'ready' });
+      });
+
+      window.addEventListener('message', handleMessage);
+    </script>
+  </body>
+</html>

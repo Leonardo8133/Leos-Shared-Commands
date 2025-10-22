@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { Command, ExecutionResult, ResolvedVariable } from '../types';
 import { VariableResolver } from '../variables/VariableResolver';
+import { MissingVariableError, UserCancelledError } from '../variables/errors';
+import { WebviewManager } from '../ui/webview/WebviewManager';
 import { TerminalManager } from './TerminalManager';
 
 export class CommandExecutor {
@@ -8,6 +10,7 @@ export class CommandExecutor {
   private variableResolver: VariableResolver;
   private terminalManager: TerminalManager;
   private treeProvider: any; // CommandTreeProvider - using any to avoid circular dependency
+  private webviewManager?: WebviewManager;
 
   private constructor() {
     this.variableResolver = VariableResolver.getInstance();
@@ -25,12 +28,18 @@ export class CommandExecutor {
     this.treeProvider = treeProvider;
   }
 
+  public setWebviewManager(webviewManager: WebviewManager): void {
+    this.webviewManager = webviewManager;
+  }
+
   public async executeCommand(command: Command): Promise<ExecutionResult> {
     try {
       // Resolve variables if any
       let resolvedCommand = command.command;
-      if (command.variables && command.variables.length > 0) {
-        const resolvedVariables = await this.variableResolver.resolveVariables(command.variables);
+      const placeholders = this.variableResolver.extractPlaceholders(command.command);
+
+      if (placeholders.length > 0) {
+        const resolvedVariables = await this.variableResolver.resolveCommandVariables(command);
         resolvedCommand = this.substituteVariables(resolvedCommand, resolvedVariables);
       }
 
@@ -42,9 +51,27 @@ export class CommandExecutor {
         output: `Command executed: ${resolvedCommand}`
       };
     } catch (error) {
+      if (error instanceof UserCancelledError) {
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
+      if (error instanceof MissingVariableError) {
+        vscode.window.showErrorMessage(
+          `Variable "${error.key}" is not configured. Please review the command before running it again.`
+        );
+        this.webviewManager?.showCommandEditor(command);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       vscode.window.showErrorMessage(`Command execution failed: ${errorMessage}`);
-      
+
       return {
         success: false,
         error: errorMessage
@@ -54,10 +81,17 @@ export class CommandExecutor {
 
   private substituteVariables(command: string, variables: ResolvedVariable[]): string {
     let result = command;
-    
+
     for (const variable of variables) {
-      const placeholder = `\${input:${variable.key}}`;
-      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), variable.value);
+      const escapedKey = variable.key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const patterns = [
+        new RegExp(`\\$\\{${escapedKey}\\}`, 'g'),
+        new RegExp(`\\$${escapedKey}(?![\\w-])`, 'g')
+      ];
+
+      patterns.forEach(pattern => {
+        result = result.replace(pattern, variable.value);
+      });
     }
 
     // Handle workspace variables

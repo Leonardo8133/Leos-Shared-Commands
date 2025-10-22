@@ -40,10 +40,10 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
     const config = this.configManager.getConfig();
     const items: CommandTreeItem[] = [];
 
-    for (const folder of config.folders) {
-      const folderItem = new CommandTreeItem(folder, 'folder');
+    config.folders.forEach((folder, index) => {
+      const folderItem = new CommandTreeItem(folder, 'folder', undefined, [index]);
       items.push(folderItem);
-    }
+    });
 
     return items;
   }
@@ -58,19 +58,19 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
 
     // Add subfolders first
     if (folder.subfolders) {
-      for (const subfolder of folder.subfolders) {
-        const subfolderItem = new CommandTreeItem(subfolder, 'folder', folderElement);
+      folder.subfolders.forEach((subfolder, index) => {
+        const subfolderItem = new CommandTreeItem(subfolder, 'folder', folderElement, [...folderElement.getFolderPath(), index]);
         items.push(subfolderItem);
-      }
+      });
     }
 
     // Add commands
-    for (const command of folder.commands) {
-      const commandItem = new CommandTreeItem(command, 'command', folderElement);
+    folder.commands.forEach((command, index) => {
+      const commandItem = new CommandTreeItem(command, 'command', folderElement, folderElement.getFolderPath(), index);
       // Track command items for state updates
       this.commandTreeItems.set(command.id, commandItem);
       items.push(commandItem);
-    }
+    });
 
     return items;
   }

@@ -55,6 +55,11 @@
         "icon": "$(new-folder)"
       },
       {
+        "command": "commandManager.editFolder",
+        "title": "Edit Folder",
+        "icon": "$(gear)"
+      },
+      {
         "command": "commandManager.duplicateCommand",
         "title": "Duplicate Command"
       },
@@ -76,6 +81,11 @@
         "command": "commandManager.openConfiguration",
         "title": "Configuration",
         "icon": "$(gear)"
+      },
+      {
+        "command": "commandManager.quickRun",
+        "title": "Run Saved Command",
+        "icon": "$(rocket)"
       }
     ],
     "menus": {
@@ -141,6 +151,11 @@
           "command": "commandManager.newFolder",
           "when": "view == commandManagerTree && viewItem == folder",
           "group": "3_new@2"
+        },
+        {
+          "command": "commandManager.editFolder",
+          "when": "view == commandManagerTree && viewItem == folder",
+          "group": "2_modify@1"
         }
       ]
     }
@@ -153,7 +168,8 @@
     "test": "node ./out/test/runTest.js",
     "test:watch": "npm run watch && npm run test",
     "test:playwright": "npm run compile && npx playwright test",
-    "test:all": "npm test && npm run test:playwright"
+    "test:ui": "npx wdio run wdio.conf.js",
+    "test:all": "npm test && npm run test:playwright && npm run test:ui"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
