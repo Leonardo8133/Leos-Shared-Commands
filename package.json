@@ -1,0 +1,176 @@
+{
+  "name": "command-manager",
+  "displayName": "Command Manager",
+  "description": "Manage and execute commands with variables, chains, and flexible terminal options",
+  "version": "1.0.0",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/src/extension.js",
+  "icon": "resources/icon.svg",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "command-manager",
+          "title": "Command Manager",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "command-manager": [
+        {
+          "id": "commandManagerTree",
+          "name": "Commands"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "commandManager.runCommand",
+        "title": "Run Command",
+        "icon": "$(play)"
+      },
+      {
+        "command": "commandManager.editCommand",
+        "title": "Edit Command",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "commandManager.newCommand",
+        "title": "New Command",
+        "icon": "$(add)"
+      },
+      {
+        "command": "commandManager.newFolder",
+        "title": "New Folder",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "commandManager.duplicateCommand",
+        "title": "Duplicate Command"
+      },
+      {
+        "command": "commandManager.deleteItem",
+        "title": "Delete",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "commandManager.openConfig",
+        "title": "Open Configuration File"
+      },
+      {
+        "command": "commandManager.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "commandManager.openConfiguration",
+        "title": "Configuration",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "commandManager.newCommand",
+          "when": "view == commandManagerTree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "commandManager.newFolder",
+          "when": "view == commandManagerTree",
+          "group": "navigation@2"
+        },
+        {
+          "command": "commandManager.refresh",
+          "when": "view == commandManagerTree",
+          "group": "navigation@3"
+        },
+        {
+          "command": "commandManager.openConfiguration",
+          "when": "view == commandManagerTree",
+          "group": "navigation@4"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "commandManager.runCommand",
+          "when": "view == commandManagerTree && viewItem == command",
+          "group": "inline@1"
+        },
+        {
+          "command": "commandManager.editCommand",
+          "when": "view == commandManagerTree && viewItem == command",
+          "group": "inline@2"
+        },
+        {
+          "command": "commandManager.runCommand",
+          "when": "view == commandManagerTree && viewItem == command",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "commandManager.editCommand",
+          "when": "view == commandManagerTree && viewItem == command",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "commandManager.duplicateCommand",
+          "when": "view == commandManagerTree && viewItem == command",
+          "group": "2_modify@1"
+        },
+        {
+          "command": "commandManager.deleteItem",
+          "when": "view == commandManagerTree",
+          "group": "2_modify@2"
+        },
+        {
+          "command": "commandManager.newCommand",
+          "when": "view == commandManagerTree && viewItem == folder",
+          "group": "3_new@1"
+        },
+        {
+          "command": "commandManager.newFolder",
+          "when": "view == commandManagerTree && viewItem == folder",
+          "group": "3_new@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node scripts/compile.js",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js",
+    "test:watch": "npm run watch && npm run test",
+    "test:playwright": "npm run compile && npx playwright test",
+    "test:all": "npm test && npm run test:playwright"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.0",
+    "@wdio/cli": "^9.20.0",
+    "@wdio/local-runner": "^9.20.0",
+    "@wdio/mocha-framework": "^9.20.0",
+    "@wdio/spec-reporter": "^9.20.0",
+    "glob": "^10.3.0",
+    "mocha": "^10.0.0",
+    "playwright": "^1.56.1",
+    "typescript": "^5.3.0",
+    "wdio-vscode-service": "^6.1.4",
+    "webdriverio": "^8.46.0"
+  }
+}
