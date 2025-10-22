@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'nonce-{{nonce}}'; font-src https://cdn.jsdelivr.net; img-src {{cspSource}} data:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css" />
+    <title>Command View</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background: var(--vscode-editor-background);
+      }
+      .container {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--vscode-panel-border);
+        padding-bottom: 12px;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .header .codicon {
+        font-size: 20px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        border: none;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .primary-button {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+      .primary-button:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+      .secondary-button {
+        background: transparent;
+        color: var(--vscode-button-foreground);
+        border: 1px solid var(--vscode-button-border, var(--vscode-button-background));
+      }
+      .danger-button {
+        background: var(--vscode-errorForeground);
+        color: var(--vscode-editor-background);
+      }
+      .section {
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        background: var(--vscode-editor-background);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .section-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--vscode-foreground);
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        padding: 6px 8px;
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        font-size: 12px;
+      }
+      .field textarea {
+        font-family: var(--vscode-editor-font-family, monospace);
+        min-height: 60px;
+        resize: vertical;
+      }
+      .readonly-field {
+        padding: 8px 12px;
+        background: var(--vscode-editor-background);
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 4px;
+        font-size: 12px;
+        color: var(--vscode-foreground);
+      }
+      .readonly-field.command-text {
+        font-family: var(--vscode-editor-font-family, monospace);
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .icon-preview {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+      }
+      .icon-preview .codicon {
+        font-size: 16px;
+      }
+      .icon-select-container {
+        position: relative;
+        width: 100%;
+      }
+      .icon-select-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .icon-dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        max-height: 260px;
+        overflow-y: auto;
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        background: var(--vscode-editor-background);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        display: none;
+        z-index: 1000;
+      }
+      .icon-dropdown button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 6px 10px;
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        text-align: left;
+        font-size: 12px;
+      }
+      .icon-dropdown button:hover {
+        background: var(--vscode-list-hoverBackground);
+      }
+      .variables-section {
+        display: none;
+      }
+      .variables-section.show {
+        display: block;
+      }
+      .variables-table {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) 110px 28px;
+        gap: 6px;
+        align-items: center;
+      }
+      .variable-row input,
+      .variable-row select {
+        padding: 4px 6px;
+        font-size: 11px;
+      }
+      .variables-table .header {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--vscode-descriptionForeground);
+      }
+      .variables-table .remove {
+        background: transparent;
+        border: none;
+        color: var(--vscode-errorForeground);
+        cursor: pointer;
+        padding: 0;
+      }
+      .checkbox-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .checkbox-row label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        text-transform: none;
+        font-size: 12px;
+        letter-spacing: normal;
+      }
+      .edit-mode {
+        display: none;
+      }
+      .edit-mode.active {
+        display: block;
+      }
+      .view-mode {
+        display: block;
+      }
+      .view-mode.hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1 id="command-title">
+          <span class="codicon" id="title-icon"></span>
+          <span id="title-text">Command</span>
+        </h1>
+        <div class="actions" id="view-actions">
+          <button id="edit-button" class="secondary-button">
+            <span class="codicon codicon-edit"></span>
+            Edit
+          </button>
+          <button id="run-button" class="primary-button">
+            <span class="codicon codicon-play"></span>
+            Run
+          </button>
+        </div>
+        <div class="actions edit-mode" id="edit-actions">
+          <button id="cancel-button" class="secondary-button">
+            <span class="codicon codicon-close"></span>
+            Cancel
+          </button>
+          <button id="save-button" class="primary-button">
+            <span class="codicon codicon-check"></span>
+            Save
+          </button>
+        </div>
+      </div>
+
+      <!-- View Mode -->
+      <div class="view-mode" id="view-mode">
+        <div class="section">
+          <h2 class="section-title">Command Details</h2>
+          <div class="field">
+            <label>Label</label>
+            <div class="readonly-field" id="view-label"></div>
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <div class="readonly-field" id="view-description">No description</div>
+          </div>
+          <div class="field">
+            <label>Command</label>
+            <div class="readonly-field command-text" id="view-command"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Terminal Settings</h2>
+          <div class="field">
+            <label>Type</label>
+            <div class="readonly-field" id="view-terminal-type"></div>
+          </div>
+          <div class="field">
+            <label>Terminal Name</label>
+            <div class="readonly-field" id="view-terminal-name">Default</div>
+          </div>
+          <div class="field">
+            <label>Working Directory</label>
+            <div class="readonly-field" id="view-terminal-cwd">Current directory</div>
+          </div>
+          <div class="field">
+            <label>Options</label>
+            <div class="readonly-field" id="view-terminal-options"></div>
+          </div>
+        </div>
+
+        <div class="section variables-section" id="view-variables-section">
+          <h2 class="section-title">Variables</h2>
+          <div id="view-variables-list"></div>
+        </div>
+      </div>
+
+      <!-- Edit Mode -->
+      <div class="edit-mode" id="edit-mode">
+        <div class="section">
+          <h2 class="section-title">Command Details</h2>
+          <div class="field">
+            <label for="edit-label">Label</label>
+            <input id="edit-label" type="text" required />
+          </div>
+          <div class="field">
+            <label for="edit-id">Identifier</label>
+            <input id="edit-id" type="text" required />
+          </div>
+          <div class="field">
+            <label for="edit-icon">Icon</label>
+            <div class="icon-select-container">
+              <button type="button" id="edit-icon-trigger" class="icon-select-trigger">
+                <span class="codicon" id="edit-icon-trigger-symbol" style="display: none;"></span>
+                <span id="edit-icon-trigger-text">No icon</span>
+              </button>
+              <div class="icon-dropdown" id="edit-icon-dropdown"></div>
+            </div>
+            <select id="edit-icon" style="display: none;"></select>
+          </div>
+          <div class="field">
+            <label for="edit-description">Description</label>
+            <input id="edit-description" type="text" />
+          </div>
+          <div class="field">
+            <label for="edit-command">Command</label>
+            <textarea id="edit-command" placeholder="Type the command. Use $VARIABLE to insert placeholders."></textarea>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Terminal</h2>
+          <div class="field">
+            <label for="edit-terminal-type">Type</label>
+            <select id="edit-terminal-type">
+              <option value="vscode-current">VS Code - Current terminal</option>
+              <option value="vscode-new">VS Code - Dedicated terminal</option>
+              <option value="external-cmd">External Command Prompt</option>
+              <option value="external-powershell">External PowerShell</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="edit-terminal-name">Terminal name</label>
+            <input id="edit-terminal-name" type="text" placeholder="Optional terminal name" />
+          </div>
+          <div class="field">
+            <label for="edit-terminal-cwd">Working directory</label>
+            <input id="edit-terminal-cwd" type="text" placeholder="Optional path" />
+          </div>
+          <div class="checkbox-row">
+            <label><input type="checkbox" id="edit-terminal-keep-open" checked />Keep terminal open</label>
+            <label><input type="checkbox" id="edit-terminal-clear" />Clear before running</label>
+          </div>
+        </div>
+
+        <div class="section variables-section show" id="edit-variables-section">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <h2 class="section-title">Variables</h2>
+            <button id="add-variable" type="button" class="secondary-button">Add variable</button>
+          </div>
+          <div class="variables-table" id="variables-header">
+            <div class="header">Key</div>
+            <div class="header">Label</div>
+            <div class="header">Type</div>
+            <div></div>
+          </div>
+          <div class="variables-table" id="variables-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <script nonce="{{nonce}}">
+      const vscode = acquireVsCodeApi();
+      let currentCommand = null;
+      let currentContext = null;
+      let availableVariables = [];
+      let isEditMode = false;
+
+      const iconOptions = [
+        { value: '', label: 'No icon' },
+        { value: '$(play)', label: 'Play' },
+        { value: '$(beaker)', label: 'Beaker' },
+        { value: '$(terminal)', label: 'Terminal' },
+        { value: '$(rocket)', label: 'Rocket' },
+        { value: '$(zap)', label: 'Zap' },
+        { value: '$(repo-push)', label: 'Push' },
+        { value: '$(tools)', label: 'Tools' },
+        { value: '$(gear)', label: 'Settings' },
+        { value: '$(database)', label: 'Database' },
+        { value: '$(debug)', label: 'Debug' },
+        { value: '$(triangle-right)', label: 'Run' },
+        { value: '$(watch)', label: 'Watch' },
+        { value: '$(search)', label: 'Search' },
+        { value: '$(cloud)', label: 'Cloud' },
+        { value: '$(cloud-upload)', label: 'Cloud Upload' },
+        { value: '$(cloud-download)', label: 'Cloud Download' },
+        { value: '$(sync)', label: 'Sync' },
+        { value: '$(refresh)', label: 'Refresh' },
+        { value: '$(git-branch)', label: 'Git Branch' },
+        { value: '$(git-merge)', label: 'Git Merge' },
+        { value: '$(bug)', label: 'Bug' },
+        { value: '$(check)', label: 'Check' },
+        { value: '$(x)', label: 'Close' },
+        { value: '$(warning)', label: 'Warning' },
+        { value: '$(shield)', label: 'Shield' },
+        { value: '$(lock)', label: 'Lock' },
+        { value: '$(unlock)', label: 'Unlock' },
+        { value: '$(key)', label: 'Key' },
+        { value: '$(pencil)', label: 'Edit' },
+        { value: '$(add)', label: 'Add' },
+        { value: '$(remove)', label: 'Remove' },
+        { value: '$(trash)', label: 'Trash' }
+      ];
+
+      const elements = {
+        // View elements
+        title: document.getElementById('command-title'),
+        titleIcon: document.getElementById('title-icon'),
+        titleText: document.getElementById('title-text'),
+        viewActions: document.getElementById('view-actions'),
+        editActions: document.getElementById('edit-actions'),
+        viewMode: document.getElementById('view-mode'),
+        editMode: document.getElementById('edit-mode'),
+        editButton: document.getElementById('edit-button'),
+        runButton: document.getElementById('run-button'),
+        cancelButton: document.getElementById('cancel-button'),
+        saveButton: document.getElementById('save-button'),
+        
+        // View fields
+        viewLabel: document.getElementById('view-label'),
+        viewDescription: document.getElementById('view-description'),
+        viewCommand: document.getElementById('view-command'),
+        viewTerminalType: document.getElementById('view-terminal-type'),
+        viewTerminalName: document.getElementById('view-terminal-name'),
+        viewTerminalCwd: document.getElementById('view-terminal-cwd'),
+        viewTerminalOptions: document.getElementById('view-terminal-options'),
+        viewVariablesSection: document.getElementById('view-variables-section'),
+        viewVariablesList: document.getElementById('view-variables-list'),
+        
+        // Edit fields
+        editLabel: document.getElementById('edit-label'),
+        editId: document.getElementById('edit-id'),
+        editIcon: document.getElementById('edit-icon'),
+        editIconTrigger: document.getElementById('edit-icon-trigger'),
+        editIconTriggerSymbol: document.getElementById('edit-icon-trigger-symbol'),
+        editIconTriggerText: document.getElementById('edit-icon-trigger-text'),
+        editIconDropdown: document.getElementById('edit-icon-dropdown'),
+        editDescription: document.getElementById('edit-description'),
+        editCommand: document.getElementById('edit-command'),
+        editTerminalType: document.getElementById('edit-terminal-type'),
+        editTerminalName: document.getElementById('edit-terminal-name'),
+        editTerminalCwd: document.getElementById('edit-terminal-cwd'),
+        editTerminalKeepOpen: document.getElementById('edit-terminal-keep-open'),
+        editTerminalClear: document.getElementById('edit-terminal-clear'),
+        editVariablesSection: document.getElementById('edit-variables-section'),
+        variablesContainer: document.getElementById('variables-container'),
+        addVariable: document.getElementById('add-variable')
+      };
+
+      function switchToEditMode() {
+        isEditMode = true;
+        elements.viewMode.classList.add('hidden');
+        elements.editMode.classList.add('active');
+        elements.viewActions.style.display = 'none';
+        elements.editActions.style.display = 'flex';
+        populateEditForm();
+      }
+
+      function switchToViewMode() {
+        isEditMode = false;
+        elements.viewMode.classList.remove('hidden');
+        elements.editMode.classList.remove('active');
+        elements.viewActions.style.display = 'flex';
+        elements.editActions.style.display = 'none';
+        populateViewForm();
+      }
+
+      function populateViewForm() {
+        if (!currentCommand) return;
+        
+        elements.titleText.textContent = currentCommand.label;
+        elements.viewLabel.textContent = currentCommand.label;
+        elements.viewDescription.textContent = currentCommand.description || 'No description';
+        elements.viewCommand.textContent = currentCommand.command;
+        
+        // Terminal settings
+        elements.viewTerminalType.textContent = getTerminalTypeLabel(currentCommand.terminal.type);
+        elements.viewTerminalName.textContent = currentCommand.terminal.name || 'Default';
+        elements.viewTerminalCwd.textContent = currentCommand.terminal.cwd || 'Current directory';
+        
+        const options = [];
+        if (currentCommand.terminal.keepOpen) options.push('Keep terminal open');
+        if (currentCommand.terminal.clearBeforeRun) options.push('Clear before running');
+        elements.viewTerminalOptions.textContent = options.length > 0 ? options.join(', ') : 'Default settings';
+        
+        // Variables
+        if (currentCommand.variables && currentCommand.variables.length > 0) {
+          elements.viewVariablesSection.classList.add('show');
+          elements.viewVariablesList.innerHTML = '';
+          currentCommand.variables.forEach(variable => {
+            const div = document.createElement('div');
+            div.className = 'readonly-field';
+            div.textContent = `${variable.key} (${variable.label || variable.key}) - ${variable.type}`;
+            elements.viewVariablesList.appendChild(div);
+          });
+        } else {
+          elements.viewVariablesSection.classList.remove('show');
+        }
+        
+        // Update title icon
+        updateTitleIcon();
+      }
+
+      function populateEditForm() {
+        if (!currentCommand) return;
+        
+        elements.editLabel.value = currentCommand.label || '';
+        elements.editId.value = currentCommand.id || '';
+        elements.editIcon.value = currentCommand.icon || '';
+        elements.editDescription.value = currentCommand.description || '';
+        elements.editCommand.value = currentCommand.command || '';
+        elements.editTerminalType.value = currentCommand.terminal?.type || 'vscode-new';
+        elements.editTerminalName.value = currentCommand.terminal?.name || '';
+        elements.editTerminalCwd.value = currentCommand.terminal?.cwd || '';
+        elements.editTerminalKeepOpen.checked = currentCommand.terminal?.keepOpen !== false;
+        elements.editTerminalClear.checked = currentCommand.terminal?.clearBeforeRun || false;
+        
+        renderVariables(currentCommand.variables || []);
+        updateIconTrigger();
+      }
+
+      function getTerminalTypeLabel(type) {
+        const labels = {
+          'vscode-current': 'VS Code - Current terminal',
+          'vscode-new': 'VS Code - Dedicated terminal',
+          'external-cmd': 'External Command Prompt',
+          'external-powershell': 'External PowerShell'
+        };
+        return labels[type] || type;
+      }
+
+      function updateTitleIcon() {
+        if (!currentCommand?.icon) {
+          elements.titleIcon.className = 'codicon codicon-play';
+          return;
+        }
+        const iconName = currentCommand.icon.replace('$(', '').replace(')', '');
+        elements.titleIcon.className = `codicon codicon-${iconName}`;
+      }
+
+      function updateIconTrigger() {
+        if (!elements.editIconTrigger || !elements.editIconTriggerSymbol || !elements.editIconTriggerText || !elements.editIcon) {
+          return;
+        }
+        const value = elements.editIcon.value || '';
+        if (!value) {
+          elements.editIconTriggerSymbol.style.display = 'none';
+          elements.editIconTriggerSymbol.className = 'codicon';
+          elements.editIconTriggerText.textContent = 'No icon';
+          return;
+        }
+        const iconName = value.replace('$(', '').replace(')', '');
+        const label = iconOptions.find(opt => opt.value === value)?.label || iconName;
+        elements.editIconTriggerSymbol.style.display = 'inline-block';
+        elements.editIconTriggerSymbol.className = `codicon codicon-${iconName}`;
+        elements.editIconTriggerText.textContent = label;
+      }
+
+      function renderIconDropdownItems() {
+        if (!elements.editIconDropdown) return;
+        elements.editIconDropdown.innerHTML = '';
+        iconOptions.forEach(option => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          const iconName = option.value ? option.value.replace('$(', '').replace(')', '') : '';
+          button.innerHTML = option.value
+            ? `<span class="codicon codicon-${iconName}"></span><span>${option.label}</span>`
+            : `<span>${option.label}</span>`;
+          button.addEventListener('click', () => {
+            setIconValue(option.value);
+            hideIconDropdown();
+          });
+          elements.editIconDropdown.appendChild(button);
+        });
+      }
+
+      function showIconDropdown() {
+        if (elements.editIconDropdown) {
+          elements.editIconDropdown.style.display = 'block';
+        }
+      }
+
+      function hideIconDropdown() {
+        if (elements.editIconDropdown) {
+          elements.editIconDropdown.style.display = 'none';
+        }
+      }
+
+      function setIconValue(value) {
+        if (elements.editIcon) {
+          elements.editIcon.value = value;
+          updateIconTrigger();
+        }
+      }
+
+      function renderVariables(variables) {
+        if (!elements.variablesContainer) return;
+        elements.variablesContainer.innerHTML = '';
+        variables.forEach(variable => addVariableRow(variable));
+      }
+
+      function addVariableRow(variable = { key: '', label: '', type: 'fixed' }) {
+        if (!elements.variablesContainer) return;
+        const row = document.createElement('div');
+        row.className = 'variables-table variable-row';
+        row.innerHTML = `
+          <input type="text" class="variable-key" placeholder="VARIABLE_KEY" value="${variable.key || ''}" />
+          <input type="text" class="variable-label" placeholder="Visible label" value="${variable.label || ''}" />
+          <select class="variable-type">
+            <option value="fixed" ${variable.type === 'fixed' ? 'selected' : ''}>Fixed</option>
+            <option value="list" ${variable.type === 'list' ? 'selected' : ''}>List</option>
+          </select>
+          <button type="button" class="remove" title="Remove variable">×</button>
+        `;
+        row.querySelector('.remove').addEventListener('click', () => {
+          row.remove();
+        });
+        elements.variablesContainer.appendChild(row);
+      }
+
+      function collectVariables() {
+        if (!elements.variablesContainer) return [];
+        const rows = Array.from(elements.variablesContainer.querySelectorAll('.variable-row'));
+        return rows
+          .map(row => ({
+            key: row.querySelector('.variable-key').value.trim(),
+            label: row.querySelector('.variable-label').value.trim(),
+            type: row.querySelector('.variable-type').value
+          }))
+          .filter(variable => variable.key);
+      }
+
+      function collectCommand() {
+        return {
+          id: elements.editId.value.trim(),
+          label: elements.editLabel.value.trim(),
+          description: elements.editDescription.value.trim() || undefined,
+          icon: elements.editIcon.value || undefined,
+          command: elements.editCommand.value,
+          terminal: {
+            type: elements.editTerminalType.value,
+            name: elements.editTerminalName.value.trim() || undefined,
+            cwd: elements.editTerminalCwd.value.trim() || undefined,
+            keepOpen: elements.editTerminalKeepOpen.checked,
+            clearBeforeRun: elements.editTerminalClear.checked
+          },
+          variables: collectVariables()
+        };
+      }
+
+      function handleEdit() {
+        switchToEditMode();
+      }
+
+      function handleRun() {
+        if (currentCommand) {
+          vscode.postMessage({ type: 'runCommand', command: currentCommand });
+        }
+      }
+
+      function handleSave() {
+        const command = collectCommand();
+        if (!command.id || !command.label || !command.command) {
+          vscode.postMessage({ type: 'error', message: 'Command requires id, label and command text.' });
+          return;
+        }
+        vscode.postMessage({ type: 'saveCommand', command, context: currentContext });
+        switchToViewMode();
+      }
+
+      function handleCancel() {
+        switchToViewMode();
+      }
+
+      function handleMessage(event) {
+        const message = event.data;
+        switch (message.type) {
+          case 'init':
+            currentCommand = message.command;
+            currentContext = message.context;
+            availableVariables = message.variables || [];
+            populateViewForm();
+            break;
+          case 'variables':
+            availableVariables = message.variables || [];
+            break;
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        // Populate icon dropdown
+        if (elements.editIcon) {
+          elements.editIcon.innerHTML = '';
+          iconOptions.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.value;
+            opt.textContent = option.label;
+            elements.editIcon.appendChild(opt);
+          });
+          renderIconDropdownItems();
+        }
+
+        // Event listeners
+        elements.editButton.addEventListener('click', handleEdit);
+        elements.runButton.addEventListener('click', handleRun);
+        elements.saveButton.addEventListener('click', handleSave);
+        elements.cancelButton.addEventListener('click', handleCancel);
+        
+        if (elements.editIconTrigger) {
+          elements.editIconTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (elements.editIconDropdown.style.display === 'block') {
+              hideIconDropdown();
+            } else {
+              showIconDropdown();
+            }
+          });
+        }
+        
+        if (elements.addVariable) {
+          elements.addVariable.addEventListener('click', () => {
+            addVariableRow();
+          });
+        }
+
+        document.addEventListener('click', (event) => {
+          if (elements.editIconDropdown && !elements.editIconDropdown.contains(event.target) && event.target !== elements.editIconTrigger) {
+            hideIconDropdown();
+          }
+        });
+
+        vscode.postMessage({ type: 'ready' });
+      });
+
+      window.addEventListener('message', handleMessage);
+    </script>
+  </body>
+</html>

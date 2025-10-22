@@ -191,7 +191,7 @@ export class CommandExecutor {
       // Show preview with variable placeholders
       for (const variable of command.variables) {
         const placeholder = `\${input:${variable.key}}`;
-        const previewValue = variable.defaultValue || `[${variable.label}]`;
+        const previewValue = `[${variable.label || variable.key}]`;
         resolvedCommand = resolvedCommand.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), previewValue);
       }
     }

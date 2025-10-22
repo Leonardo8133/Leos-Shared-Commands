@@ -22,6 +22,16 @@
                 "reveal": "silent"
             },
             "problemMatcher": "$tsc-watch"
+        },
+        {
+            "type": "npm",
+            "script": "watch:all",
+            "isBackground": true,
+            "group": "build",
+            "presentation": {
+                "reveal": "silent"
+            },
+            "problemMatcher": ["$tsc-watch", "$less-watch"]
         }
     ]
 }

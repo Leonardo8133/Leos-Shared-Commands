@@ -35,8 +35,9 @@ export interface TerminalConfig {
 
 export interface CommandVariable {
   key: string;
+  value: string;
   label?: string;
-  type: 'fixed' | 'list';
+  type: 'fixed' | 'options';
   description?: string;
 }
 

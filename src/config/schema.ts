@@ -29,8 +29,9 @@ export function getDefaultConfig(): CommandConfig {
             variables: [
               {
                 key: 'ENVIRONMENT_NAME',
+                value: 'production\ndevelopment\nstaging',
                 label: 'Environment',
-                type: 'list'
+                type: 'options'
               }
             ],
             description: 'Builds the project using one of the configured environments'
@@ -118,8 +119,8 @@ export function validateConfig(config: any): { valid: boolean; errors: string[] 
               errors.push(`Variable ${variableIndex} in command ${commandIndex} must have a key`);
             }
 
-            if (variable.type !== 'fixed' && variable.type !== 'list') {
-              errors.push(`Variable ${variableIndex} in command ${commandIndex} must be of type "fixed" or "list"`);
+            if (variable.type !== 'fixed' && variable.type !== 'options') {
+              errors.push(`Variable ${variableIndex} in command ${commandIndex} must be of type "fixed" or "options"`);
             }
           });
         }

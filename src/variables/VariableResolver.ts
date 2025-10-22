@@ -6,7 +6,7 @@ import { MissingVariableError, UserCancelledError } from './errors';
 interface VariableMetadata {
   key: string;
   label?: string;
-  type: 'fixed' | 'list';
+  type: 'fixed' | 'options';
   description?: string;
   value?: string;
   options?: string[];
@@ -59,7 +59,7 @@ export class VariableResolver {
       variables.push({
         key: list.key,
         label: list.label,
-        type: 'list',
+        type: 'options',
         description: list.description,
         options: list.options
       });
@@ -90,34 +90,50 @@ export class VariableResolver {
       const sharedVariable = variableMap.get(key);
       const sharedList = listMap.get(key);
 
-      const type = variableDefinition?.type || (sharedList ? 'list' : sharedVariable ? 'fixed' : undefined);
+      const type = variableDefinition?.type || (sharedList ? 'options' : sharedVariable ? 'fixed' : undefined);
 
       if (!type) {
         throw new MissingVariableError(key);
       }
 
       if (type === 'fixed') {
-        if (!sharedVariable) {
+        if (variableDefinition) {
+          resolved.push({ key, value: variableDefinition.value });
+        } else if (sharedVariable) {
+          resolved.push({ key, value: sharedVariable.value });
+        } else {
           throw new MissingVariableError(key);
         }
-        resolved.push({ key, value: sharedVariable.value });
         continue;
       }
 
-      if (!sharedList) {
-        throw new MissingVariableError(key);
+      if (type === 'options') {
+        let options: string[] = [];
+        let quickPickLabel = key;
+
+        if (variableDefinition) {
+          // Use command variable options
+          options = variableDefinition.value.split('\n').filter(opt => opt.trim());
+          quickPickLabel = variableDefinition.label || key;
+        } else if (sharedList) {
+          // Use shared list options
+          options = sharedList.options;
+          quickPickLabel = sharedList.label || key;
+        } else {
+          throw new MissingVariableError(key);
+        }
+
+        const selection = await vscode.window.showQuickPick(options, {
+          placeHolder: `Select ${quickPickLabel}`
+        });
+
+        if (!selection) {
+          throw new UserCancelledError();
+        }
+
+        resolved.push({ key, value: selection });
+        continue;
       }
-
-      const quickPickLabel = variableDefinition?.label || sharedList.label || key;
-      const selection = await vscode.window.showQuickPick(sharedList.options, {
-        placeHolder: `Select ${quickPickLabel}`
-      });
-
-      if (!selection) {
-        throw new UserCancelledError();
-      }
-
-      resolved.push({ key, value: selection });
     }
 
     return resolved;
