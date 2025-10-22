@@ -8,21 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet
+- Drag-and-drop support for reorganising folders and commands directly inside the
+  Command Manager tree view.
+- Status bar enhancements with a hoverable command menu and support for pinning
+  frequently used commands as dedicated status bar shortcuts.
 
 ### Changed
-- Captured the latest command manager work in version control to avoid losing
-  the previously implemented functionality.
+- The default status bar shortcut now displays the full command hierarchy on
+  hover instead of opening a quick pick list.
 
 ### Deprecated
 - Nothing yet
 
 ### Removed
-- Nothing yet
+- Manual "keep terminal open" and "clear before running" options from the command
+  editors. Terminals now always stay open and output is preserved between runs.
 
 ### Fixed
-- Documented that the outstanding work has been committed so that subsequent
-  updates can iterate safely.
+- Improved command execution reliability for external Command Prompt and
+  PowerShell sessions.
+- Dedicated VS Code terminals no longer depend on optional terminal names to
+  persist between runs.
 
 ### Security
 - Nothing yet

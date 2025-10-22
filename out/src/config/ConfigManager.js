@@ -40,6 +40,7 @@ const fs = __importStar(require("fs"));
 const schema_1 = require("./schema");
 class ConfigManager {
     constructor() {
+        this.onConfigChangeCallbacks = [];
         this.configPath = path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', '.vscode', 'commands.json');
         this.config = (0, schema_1.getDefaultConfig)();
     }
@@ -75,6 +76,7 @@ class ConfigManager {
         const configJson = JSON.stringify(config, null, 2);
         await fs.promises.writeFile(this.configPath, configJson, 'utf8');
         this.config = config;
+        this.notifyConfigChange();
     }
     async loadConfig() {
         try {
@@ -104,21 +106,21 @@ class ConfigManager {
         return this.configPath;
     }
     setOnConfigChange(callback) {
-        this.onConfigChange = callback;
+        this.onConfigChangeCallbacks.push(callback);
     }
     setupFileWatcher() {
         this.watcher = vscode.workspace.createFileSystemWatcher(this.configPath);
         this.watcher.onDidChange(async () => {
             await this.loadConfig();
-            this.onConfigChange?.();
+            this.notifyConfigChange();
         });
         this.watcher.onDidCreate(async () => {
             await this.loadConfig();
-            this.onConfigChange?.();
+            this.notifyConfigChange();
         });
         this.watcher.onDidDelete(async () => {
             this.config = (0, schema_1.getDefaultConfig)();
-            this.onConfigChange?.();
+            this.notifyConfigChange();
         });
     }
     dispose() {
@@ -137,6 +139,16 @@ class ConfigManager {
         const backupData = await fs.promises.readFile(backupPath, 'utf8');
         const parsedConfig = JSON.parse(backupData);
         await this.saveConfig(parsedConfig);
+    }
+    notifyConfigChange() {
+        for (const callback of this.onConfigChangeCallbacks) {
+            try {
+                callback();
+            }
+            catch (error) {
+                console.warn('Config change callback failed', error);
+            }
+        }
     }
     async importCommands(filePath) {
         const importData = await fs.promises.readFile(filePath, 'utf8');

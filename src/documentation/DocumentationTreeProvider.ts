@@ -391,8 +391,7 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
       description: `Extracted from ${folderName}`,
       terminal: {
         type: 'vscode-new',
-        name: folderName,
-        keepOpen: true
+        name: folderName
       }
     };
   }

@@ -5,6 +5,7 @@ import { CommandExecutor } from './execution/CommandExecutor';
 import { WebviewManager } from './ui/webview/WebviewManager';
 import { CommandTreeItem } from './treeView/CommandTreeItem';
 import { DocumentationTreeProvider } from './documentation/DocumentationTreeProvider';
+import { StatusBarManager } from './ui/StatusBarManager';
 
 type DocumentationPosition = 'top' | 'bottom';
 
@@ -42,7 +43,8 @@ export function activate(context: vscode.ExtensionContext) {
     // Create tree provider
     const treeProvider = new CommandTreeProvider();
     const commandTreeView = vscode.window.createTreeView('commandManagerTree', {
-        treeDataProvider: treeProvider
+        treeDataProvider: treeProvider,
+        dragAndDropController: treeProvider.dragAndDropController
     });
 
     const documentationProvider = new DocumentationTreeProvider(configManager);
@@ -56,12 +58,8 @@ export function activate(context: vscode.ExtensionContext) {
     commandExecutor.setWebviewManager(webviewManager);
     webviewManager.setTreeProvider(treeProvider);
 
-    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBarItem.text = '$(rocket) Commands';
-    statusBarItem.tooltip = 'Run a saved command';
-    statusBarItem.command = 'commandManager.quickRun';
-    statusBarItem.show();
-    context.subscriptions.push(statusBarItem, documentationProvider, documentationTreeView, commandTreeView);
+    const statusBarManager = new StatusBarManager(context, treeProvider, configManager);
+    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView);
 
     const applyPosition = () => {
         const configuration = vscode.workspace.getConfiguration('commandManager.documentationHub');
@@ -90,6 +88,38 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }
         }
+    });
+
+    const runCommandById = vscode.commands.registerCommand('commandManager.runCommandById', async (payload: string | { commandId: string }) => {
+        const commandId = typeof payload === 'string' ? payload : payload?.commandId;
+        if (!commandId) {
+            return;
+        }
+
+        const command = await treeProvider.findCommandById(commandId);
+        if (!command) {
+            vscode.window.showWarningMessage(`Command "${commandId}" not found.`);
+            return;
+        }
+
+        try {
+            await commandExecutor.executeCommandWithProgress(command);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to execute command: ${error}`);
+        }
+    });
+
+    const pinToStatusBar = vscode.commands.registerCommand('commandManager.pinToStatusBar', async (item: CommandTreeItem) => {
+        if (!item || !item.isCommand()) {
+            return;
+        }
+
+        const command = item.getCommand();
+        if (!command) {
+            return;
+        }
+
+        await statusBarManager.togglePin(command);
     });
 
 
@@ -332,6 +362,8 @@ export function activate(context: vscode.ExtensionContext) {
         newFolder,
         editFolder,
         duplicateCommand,
+        runCommandById,
+        pinToStatusBar,
         deleteItem,
         openConfig,
         refresh,

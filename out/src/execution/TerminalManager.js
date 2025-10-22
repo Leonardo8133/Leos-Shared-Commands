@@ -93,13 +93,6 @@ class TerminalManager {
         await this.executeInTerminal(terminal, command, config);
     }
     async executeInTerminal(terminal, command, config) {
-        // Store terminal reference if we want to keep it open (do this first)
-        if (config.keepOpen && config.name) {
-            this.terminals.set(config.name, terminal);
-        }
-        if (config.clearBeforeRun) {
-            terminal.sendText('clear');
-        }
         // Change directory if specified
         if (config.cwd) {
             terminal.sendText(`cd "${config.cwd}"`);
@@ -107,22 +100,25 @@ class TerminalManager {
         terminal.sendText(command);
     }
     async executeInExternalCmd(command, config) {
-        const args = ['/c', 'start', 'cmd', '/k', command];
+        const args = ['/c', 'start', '""', 'cmd.exe', '/k', command];
         if (config.cwd) {
             args.splice(2, 0, '/d', config.cwd);
         }
-        const process = child_process.spawn('cmd', args, {
+        const process = child_process.spawn('cmd.exe', args, {
             detached: true,
-            stdio: 'ignore'
+            stdio: 'ignore',
+            windowsVerbatimArguments: true
         });
         process.unref();
     }
     async executeInExternalPowerShell(command, config) {
-        const args = ['-NoExit', '-Command', command];
-        const process = child_process.spawn('powershell', args, {
+        const script = `& { ${command} }`;
+        const args = ['-NoExit', '-Command', script];
+        const process = child_process.spawn('powershell.exe', args, {
             cwd: config.cwd,
             detached: true,
-            stdio: 'ignore'
+            stdio: 'ignore',
+            windowsVerbatimArguments: true
         });
         process.unref();
     }

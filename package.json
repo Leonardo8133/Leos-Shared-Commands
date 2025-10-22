@@ -68,6 +68,10 @@
         "icon": "$(play)"
       },
       {
+        "command": "commandManager.runCommandById",
+        "title": "Run Saved Command"
+      },
+      {
         "command": "commandManager.editCommand",
         "title": "Edit Command",
         "icon": "$(edit)"
@@ -90,6 +94,10 @@
       {
         "command": "commandManager.duplicateCommand",
         "title": "Duplicate Command"
+      },
+      {
+        "command": "commandManager.pinToStatusBar",
+        "title": "Pin Command in Status Bar"
       },
       {
         "command": "commandManager.deleteItem",
@@ -223,6 +231,11 @@
           "command": "commandManager.editCommand",
           "when": "view == commandManagerTree && viewItem == command",
           "group": "1_actions@2"
+        },
+        {
+          "command": "commandManager.pinToStatusBar",
+          "when": "view == commandManagerTree && viewItem == command",
+          "group": "1_actions@3"
         },
         {
           "command": "commandManager.duplicateCommand",

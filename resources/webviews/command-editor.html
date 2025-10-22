@@ -363,10 +363,6 @@
               <input id="terminal-cwd" type="text" placeholder="Optional path" />
             </div>
           </div>
-          <div class="checkbox-row">
-            <label><input type="checkbox" id="terminal-keep-open" checked />Keep terminal open</label>
-            <label><input type="checkbox" id="terminal-clear" />Clear before running</label>
-          </div>
         </div>
         <div class="section" style="margin: 0;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -451,8 +447,6 @@
         terminalType: document.getElementById('terminal-type'),
         terminalName: document.getElementById('terminal-name'),
         terminalCwd: document.getElementById('terminal-cwd'),
-        keepOpen: document.getElementById('terminal-keep-open'),
-        clearBeforeRun: document.getElementById('terminal-clear'),
         variablesContainer: document.getElementById('variables-container'),
         form: document.getElementById('command-form'),
         cancel: document.getElementById('cancel-button'),
@@ -927,8 +921,6 @@
         elements.terminalType.value = command?.terminal?.type || 'vscode-new';
         elements.terminalName.value = command?.terminal?.name || '';
         elements.terminalCwd.value = command?.terminal?.cwd || '';
-        elements.keepOpen.checked = command?.terminal?.keepOpen !== false;
-        elements.clearBeforeRun.checked = command?.terminal?.clearBeforeRun || false;
         renderVariables(command?.variables || []);
         updatePreview();
       }
@@ -965,9 +957,7 @@
           terminal: {
             type: elements.terminalType.value,
             name: elements.terminalName.value.trim() || undefined,
-            cwd: elements.terminalCwd.value.trim() || undefined,
-            keepOpen: elements.keepOpen.checked,
-            clearBeforeRun: elements.clearBeforeRun.checked
+            cwd: elements.terminalCwd.value.trim() || undefined
           },
           variables: processedVariables
         };

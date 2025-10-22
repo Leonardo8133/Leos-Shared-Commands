@@ -9,7 +9,7 @@ export class ConfigManager {
   private config: CommandConfig;
   private configPath: string;
   private watcher?: vscode.FileSystemWatcher;
-  private onConfigChange?: () => void;
+  private onConfigChangeCallbacks: Array<() => void> = [];
 
   private constructor() {
     this.configPath = path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', '.vscode', 'commands.json');
@@ -55,6 +55,7 @@ export class ConfigManager {
     const configJson = JSON.stringify(config, null, 2);
     await fs.promises.writeFile(this.configPath, configJson, 'utf8');
     this.config = config;
+    this.notifyConfigChange();
   }
 
   public async loadConfig(): Promise<void> {
@@ -87,22 +88,22 @@ export class ConfigManager {
   }
 
   public setOnConfigChange(callback: () => void): void {
-    this.onConfigChange = callback;
+    this.onConfigChangeCallbacks.push(callback);
   }
 
   private setupFileWatcher(): void {
     this.watcher = vscode.workspace.createFileSystemWatcher(this.configPath);
     this.watcher.onDidChange(async () => {
       await this.loadConfig();
-      this.onConfigChange?.();
+      this.notifyConfigChange();
     });
     this.watcher.onDidCreate(async () => {
       await this.loadConfig();
-      this.onConfigChange?.();
+      this.notifyConfigChange();
     });
     this.watcher.onDidDelete(async () => {
       this.config = getDefaultConfig();
-      this.onConfigChange?.();
+      this.notifyConfigChange();
     });
   }
 
@@ -125,6 +126,16 @@ export class ConfigManager {
     const backupData = await fs.promises.readFile(backupPath, 'utf8');
     const parsedConfig = JSON.parse(backupData);
     await this.saveConfig(parsedConfig);
+  }
+
+  private notifyConfigChange(): void {
+    for (const callback of this.onConfigChangeCallbacks) {
+      try {
+        callback();
+      } catch (error) {
+        console.warn('Config change callback failed', error);
+      }
+    }
   }
 
   public async importCommands(filePath: string): Promise<void> {
