@@ -41,6 +41,7 @@ const CommandTreeProvider_1 = require("./treeView/CommandTreeProvider");
 const CommandExecutor_1 = require("./execution/CommandExecutor");
 const WebviewManager_1 = require("./ui/webview/WebviewManager");
 const DocumentationTreeProvider_1 = require("./documentation/DocumentationTreeProvider");
+const StatusBarManager_1 = require("./ui/StatusBarManager");
 async function applyDocumentationViewPosition(position) {
     try {
         if (position === 'top') {
@@ -73,7 +74,8 @@ function activate(context) {
     // Create tree provider
     const treeProvider = new CommandTreeProvider_1.CommandTreeProvider();
     const commandTreeView = vscode.window.createTreeView('commandManagerTree', {
-        treeDataProvider: treeProvider
+        treeDataProvider: treeProvider,
+        dragAndDropController: treeProvider.dragAndDropController
     });
     const documentationProvider = new DocumentationTreeProvider_1.DocumentationTreeProvider(configManager);
     const documentationTreeView = vscode.window.createTreeView('documentationHubTree', {
@@ -84,12 +86,8 @@ function activate(context) {
     commandExecutor.setTreeProvider(treeProvider);
     commandExecutor.setWebviewManager(webviewManager);
     webviewManager.setTreeProvider(treeProvider);
-    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBarItem.text = '$(rocket) Commands';
-    statusBarItem.tooltip = 'Run a saved command';
-    statusBarItem.command = 'commandManager.quickRun';
-    statusBarItem.show();
-    context.subscriptions.push(statusBarItem, documentationProvider, documentationTreeView, commandTreeView);
+    const statusBarManager = new StatusBarManager_1.StatusBarManager(context, treeProvider, configManager);
+    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView);
     const applyPosition = () => {
         const configuration = vscode.workspace.getConfiguration('commandManager.documentationHub');
         const desiredPosition = configuration.get('position', 'bottom');
@@ -115,6 +113,33 @@ function activate(context) {
                 }
             }
         }
+    });
+    const runCommandById = vscode.commands.registerCommand('commandManager.runCommandById', async (payload) => {
+        const commandId = typeof payload === 'string' ? payload : payload?.commandId;
+        if (!commandId) {
+            return;
+        }
+        const command = await treeProvider.findCommandById(commandId);
+        if (!command) {
+            vscode.window.showWarningMessage(`Command "${commandId}" not found.`);
+            return;
+        }
+        try {
+            await commandExecutor.executeCommandWithProgress(command);
+        }
+        catch (error) {
+            vscode.window.showErrorMessage(`Failed to execute command: ${error}`);
+        }
+    });
+    const pinToStatusBar = vscode.commands.registerCommand('commandManager.pinToStatusBar', async (item) => {
+        if (!item || !item.isCommand()) {
+            return;
+        }
+        const command = item.getCommand();
+        if (!command) {
+            return;
+        }
+        await statusBarManager.togglePin(command);
     });
     const editCommand = vscode.commands.registerCommand('commandManager.editCommand', async (item) => {
         if (item && item.isCommand()) {
@@ -323,7 +348,7 @@ function activate(context) {
     // Register context menu for tree view
     vscode.window.registerTreeDataProvider('commandManagerTree', treeProvider);
     // Add all commands to context
-    context.subscriptions.push(runCommand, editCommand, newCommand, newFolder, editFolder, duplicateCommand, deleteItem, openConfig, refresh, openConfiguration, quickRun, importCommands, exportCommands);
+    context.subscriptions.push(runCommand, editCommand, newCommand, newFolder, editFolder, duplicateCommand, runCommandById, pinToStatusBar, deleteItem, openConfig, refresh, openConfiguration, quickRun, importCommands, exportCommands);
     // Documentation hub commands
     const openDocumentation = vscode.commands.registerCommand('documentationHub.openFile', async (uri) => {
         await documentationProvider.openFile(uri);

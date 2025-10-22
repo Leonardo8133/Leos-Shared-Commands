@@ -349,8 +349,7 @@ class DocumentationTreeProvider {
             description: `Extracted from ${folderName}`,
             terminal: {
                 type: 'vscode-new',
-                name: folderName,
-                keepOpen: true
+                name: folderName
             }
         };
     }

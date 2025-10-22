@@ -13,8 +13,7 @@ export function getDefaultConfig(): CommandConfig {
             command: 'echo "Hello from Command Manager"',
             terminal: {
               type: 'vscode-new',
-              name: 'Command Manager',
-              keepOpen: true
+              name: 'Command Manager'
             },
             description: 'Sample command that echoes a welcome message'
           },
@@ -23,8 +22,7 @@ export function getDefaultConfig(): CommandConfig {
             label: 'Build for environment',
             command: 'npm run build -- --env $ENVIRONMENT_NAME',
             terminal: {
-              type: 'vscode-current',
-              keepOpen: true
+              type: 'vscode-current'
             },
             variables: [
               {

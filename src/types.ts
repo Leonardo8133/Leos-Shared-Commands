@@ -28,8 +28,6 @@ export interface Command {
 export interface TerminalConfig {
   type: 'vscode-current' | 'vscode-new' | 'external-cmd' | 'external-powershell';
   name?: string;
-  keepOpen?: boolean;
-  clearBeforeRun?: boolean;
   cwd?: string;
 }
 

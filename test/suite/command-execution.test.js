@@ -57,7 +57,7 @@ suite('Command execution integration', () => {
       id: 'fixed-test',
       label: 'Echo fixed',
       command: 'echo $FOO',
-      terminal: { type: 'vscode-new', keepOpen: false },
+      terminal: { type: 'vscode-new' },
       variables: [{ key: 'FOO', type: 'fixed', label: 'Foo' }]
     });
 
@@ -73,7 +73,7 @@ suite('Command execution integration', () => {
       id: 'list-test',
       label: 'Deploy',
       command: 'deploy $TARGET',
-      terminal: { type: 'vscode-new', keepOpen: false },
+      terminal: { type: 'vscode-new' },
       variables: [{ key: 'TARGET', type: 'list', label: 'Target' }]
     });
 
@@ -86,7 +86,7 @@ suite('Command execution integration', () => {
       id: 'missing-test',
       label: 'Missing variable',
       command: 'echo $MISSING',
-      terminal: { type: 'vscode-new', keepOpen: false },
+      terminal: { type: 'vscode-new' },
       variables: [{ key: 'MISSING', type: 'fixed', label: 'Missing' }]
     });
 
