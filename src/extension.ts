@@ -4,6 +4,29 @@ import { CommandTreeProvider } from './treeView/CommandTreeProvider';
 import { CommandExecutor } from './execution/CommandExecutor';
 import { WebviewManager } from './ui/webview/WebviewManager';
 import { CommandTreeItem } from './treeView/CommandTreeItem';
+import { DocumentationTreeProvider } from './documentation/DocumentationTreeProvider';
+
+type DocumentationPosition = 'top' | 'bottom';
+
+async function applyDocumentationViewPosition(position: DocumentationPosition): Promise<void> {
+    try {
+        if (position === 'top') {
+            await vscode.commands.executeCommand('vscode.moveViews', {
+                viewIds: ['documentationHubTree'],
+                destinationId: 'command-manager',
+                position: { before: 'commandManagerTree' }
+            });
+        } else {
+            await vscode.commands.executeCommand('vscode.moveViews', {
+                viewIds: ['documentationHubTree'],
+                destinationId: 'command-manager',
+                position: { after: 'commandManagerTree' }
+            });
+        }
+    } catch (error) {
+        console.warn('Failed to apply documentation hub position', error);
+    }
+}
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Command Manager extension is now active!');
@@ -18,8 +41,14 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Create tree provider
     const treeProvider = new CommandTreeProvider();
-    vscode.window.createTreeView('commandManagerTree', {
+    const commandTreeView = vscode.window.createTreeView('commandManagerTree', {
         treeDataProvider: treeProvider
+    });
+
+    const documentationProvider = new DocumentationTreeProvider(configManager);
+    const documentationTreeView = vscode.window.createTreeView('documentationHubTree', {
+        treeDataProvider: documentationProvider,
+        showCollapseAll: true
     });
 
     // Set tree provider in executor for icon updates
@@ -32,7 +61,22 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarItem.tooltip = 'Run a saved command';
     statusBarItem.command = 'commandManager.quickRun';
     statusBarItem.show();
-    context.subscriptions.push(statusBarItem);
+    context.subscriptions.push(statusBarItem, documentationProvider, documentationTreeView, commandTreeView);
+
+    const applyPosition = () => {
+        const configuration = vscode.workspace.getConfiguration('commandManager.documentationHub');
+        const desiredPosition = configuration.get<DocumentationPosition>('position', 'bottom');
+        void applyDocumentationViewPosition(desiredPosition);
+    };
+
+    applyPosition();
+
+    const configurationListener = vscode.workspace.onDidChangeConfiguration(event => {
+        if (event.affectsConfiguration('commandManager.documentationHub.position')) {
+            applyPosition();
+        }
+    });
+    context.subscriptions.push(configurationListener);
 
     // Register commands
     const runCommand = vscode.commands.registerCommand('commandManager.runCommand', async (item: CommandTreeItem) => {
@@ -295,6 +339,51 @@ export function activate(context: vscode.ExtensionContext) {
         quickRun,
         importCommands,
         exportCommands
+    );
+
+    // Documentation hub commands
+    const openDocumentation = vscode.commands.registerCommand('documentationHub.openFile', async (uri: vscode.Uri) => {
+        await documentationProvider.openFile(uri);
+    });
+
+    const copyDocumentationPath = vscode.commands.registerCommand('documentationHub.copyPath', async (uri: vscode.Uri) => {
+        await documentationProvider.copyFilePath(uri);
+    });
+
+    const extractDocumentationCommands = vscode.commands.registerCommand(
+        'documentationHub.extractCommands',
+        async (uri: vscode.Uri) => {
+            await documentationProvider.extractCommandsFromReadme(uri);
+        }
+    );
+
+    const searchDocumentation = vscode.commands.registerCommand('documentationHub.search', async () => {
+        await documentationProvider.setSearchQuery();
+    });
+
+    const toggleDocumentationViewMode = vscode.commands.registerCommand('documentationHub.toggleViewMode', () => {
+        documentationProvider.toggleViewMode();
+    });
+
+    const refreshDocumentation = vscode.commands.registerCommand('documentationHub.refresh', async () => {
+        await documentationProvider.reload();
+    });
+
+    const openDocumentationSection = vscode.commands.registerCommand(
+        'documentationHub.openSection',
+        async (target: { path: string; line: number }) => {
+            await documentationProvider.openSection(target);
+        }
+    );
+
+    context.subscriptions.push(
+        openDocumentation,
+        copyDocumentationPath,
+        extractDocumentationCommands,
+        searchDocumentation,
+        toggleDocumentationViewMode,
+        refreshDocumentation,
+        openDocumentationSection
     );
 
     // Show welcome message

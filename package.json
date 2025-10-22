@@ -29,7 +29,13 @@
       "command-manager": [
         {
           "id": "commandManagerTree",
-          "name": "Commands"
+          "name": "Commands",
+          "group": "1_commands"
+        },
+        {
+          "id": "documentationHubTree",
+          "name": "Documentation Hub",
+          "group": "2_documentation"
         }
       ]
     },
@@ -86,6 +92,37 @@
         "command": "commandManager.quickRun",
         "title": "Run Saved Command",
         "icon": "$(rocket)"
+      },
+      {
+        "command": "documentationHub.openFile",
+        "title": "Documentation Hub: Open File"
+      },
+      {
+        "command": "documentationHub.copyPath",
+        "title": "Documentation Hub: Copy Path"
+      },
+      {
+        "command": "documentationHub.extractCommands",
+        "title": "Documentation Hub: Extract Commands"
+      },
+      {
+        "command": "documentationHub.search",
+        "title": "Documentation Hub: Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "documentationHub.toggleViewMode",
+        "title": "Documentation Hub: Toggle View Mode",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "documentationHub.refresh",
+        "title": "Documentation Hub: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "documentationHub.openSection",
+        "title": "Documentation Hub: Open Section"
       }
     ],
     "menus": {
@@ -109,6 +146,21 @@
           "command": "commandManager.openConfiguration",
           "when": "view == commandManagerTree",
           "group": "navigation@4"
+        },
+        {
+          "command": "documentationHub.search",
+          "when": "view == documentationHubTree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "documentationHub.toggleViewMode",
+          "when": "view == documentationHubTree",
+          "group": "navigation@2"
+        },
+        {
+          "command": "documentationHub.refresh",
+          "when": "view == documentationHubTree",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -156,8 +208,40 @@
           "command": "commandManager.editFolder",
           "when": "view == commandManagerTree && viewItem == folder",
           "group": "2_modify@1"
+        },
+        {
+          "command": "documentationHub.openFile",
+          "when": "view == documentationHubTree && (viewItem == documentationFile || viewItem == documentationReadme)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "documentationHub.copyPath",
+          "when": "view == documentationHubTree && (viewItem == documentationFile || viewItem == documentationReadme)",
+          "group": "navigation@2"
+        },
+        {
+          "command": "documentationHub.extractCommands",
+          "when": "view == documentationHubTree && viewItem == documentationReadme",
+          "group": "navigation@3"
         }
       ]
+    },
+    "configuration": {
+      "title": "Command Manager",
+      "properties": {
+        "commandManager.documentationHub.viewMode": {
+          "type": "string",
+          "enum": ["tree", "flat"],
+          "default": "tree",
+          "description": "Choose whether the documentation hub displays markdown files in a folder tree or a flat list."
+        },
+        "commandManager.documentationHub.position": {
+          "type": "string",
+          "enum": ["top", "bottom"],
+          "default": "bottom",
+          "description": "Control whether the documentation hub appears above or below the command list in the Command Manager view container."
+        }
+      }
     }
   },
   "scripts": {
