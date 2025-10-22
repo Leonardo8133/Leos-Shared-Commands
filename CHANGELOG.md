@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nothing yet
 
 ### Changed
-- Nothing yet
+- Captured the latest command manager work in version control to avoid losing
+  the previously implemented functionality.
 
 ### Deprecated
 - Nothing yet
@@ -20,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nothing yet
 
 ### Fixed
-- Nothing yet
+- Documented that the outstanding work has been committed so that subsequent
+  updates can iterate safely.
 
 ### Security
 - Nothing yet
