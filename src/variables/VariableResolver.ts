@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { Command, CommandVariable, ResolvedVariable, SharedList, SharedVariable } from '../types';
 import { ConfigManager } from '../config/ConfigManager';
 import { MissingVariableError, UserCancelledError } from './errors';
@@ -6,7 +7,7 @@ import { MissingVariableError, UserCancelledError } from './errors';
 interface VariableMetadata {
   key: string;
   label?: string;
-  type: 'fixed' | 'options';
+  type: 'fixed' | 'options' | 'file';
   description?: string;
   value?: string;
   options?: string[];
@@ -171,9 +172,52 @@ export class VariableResolver {
         resolved.push({ key, value: finalValue });
         continue;
       }
+
+      if (type === 'file') {
+        const basePath = variableDefinition?.value?.trim() || '';
+        const defaultUri = this.resolveBaseDirectoryUri(basePath);
+
+        const selection = await vscode.window.showOpenDialog({
+          canSelectFiles: true,
+          canSelectFolders: false,
+          canSelectMany: false,
+          openLabel: variableDefinition?.label ? `Select ${variableDefinition.label}` : 'Select file',
+          defaultUri
+        });
+
+        if (!selection || selection.length === 0) {
+          throw new UserCancelledError();
+        }
+
+        resolved.push({ key, value: selection[0].fsPath });
+        continue;
+      }
     }
 
     return resolved;
+  }
+
+  private resolveBaseDirectoryUri(inputPath: string): vscode.Uri | undefined {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+
+    if (!inputPath) {
+      return workspaceFolder?.uri;
+    }
+
+    const trimmed = inputPath.replace('${workspaceFolder}', workspaceFolder?.uri.fsPath ?? '');
+    const normalized = trimmed.trim();
+
+    if (!normalized) {
+      return workspaceFolder?.uri;
+    }
+
+    const absolutePath = path.isAbsolute(normalized)
+      ? normalized
+      : workspaceFolder
+        ? path.join(workspaceFolder.uri.fsPath, normalized)
+        : normalized;
+
+    return vscode.Uri.file(absolutePath);
   }
 
   public dispose(): void {

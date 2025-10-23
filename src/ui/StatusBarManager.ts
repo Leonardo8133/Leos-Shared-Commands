@@ -48,7 +48,10 @@ export class StatusBarManager implements vscode.Disposable {
       return false;
     }
 
-    this.pinnedCommandIds.push(command.id);
+    if (!this.pinnedCommandIds.includes(command.id)) {
+      this.pinnedCommandIds.push(command.id);
+    }
+    this.pinnedCommandIds = Array.from(new Set(this.pinnedCommandIds));
     await this.context.globalState.update(this.storageKey, this.pinnedCommandIds);
     await this.rebuildPinnedItems();
     void vscode.window.showInformationMessage(`Pinned "${command.label}" to the status bar.`);

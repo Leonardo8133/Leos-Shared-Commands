@@ -117,8 +117,8 @@ export function validateConfig(config: any): { valid: boolean; errors: string[] 
               errors.push(`Variable ${variableIndex} in command ${commandIndex} must have a key`);
             }
 
-            if (variable.type !== 'fixed' && variable.type !== 'options') {
-              errors.push(`Variable ${variableIndex} in command ${commandIndex} must be of type "fixed" or "options"`);
+            if (variable.type !== 'fixed' && variable.type !== 'options' && variable.type !== 'file') {
+              errors.push(`Variable ${variableIndex} in command ${commandIndex} must be of type "fixed", "options", or "file"`);
             }
           });
         }

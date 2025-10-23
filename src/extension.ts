@@ -122,6 +122,65 @@ export function activate(context: vscode.ExtensionContext) {
         await statusBarManager.togglePin(command);
     });
 
+    const moveItemUp = vscode.commands.registerCommand('commandManager.moveItemUp', async (item: CommandTreeItem) => {
+        if (!item) {
+            return;
+        }
+
+        await treeProvider.moveItemByOffset(item, -1);
+    });
+
+    const moveItemDown = vscode.commands.registerCommand('commandManager.moveItemDown', async (item: CommandTreeItem) => {
+        if (!item) {
+            return;
+        }
+
+        await treeProvider.moveItemByOffset(item, 1);
+    });
+
+    const moveItemToFolder = vscode.commands.registerCommand('commandManager.moveItemToFolder', async (item: CommandTreeItem) => {
+        if (!item) {
+            return;
+        }
+
+        const includeRoot = item.isFolder();
+        const excludePath = item.isFolder() ? item.getFolderPath() : undefined;
+        const quickPickItems = await treeProvider.getFolderQuickPickItems(includeRoot, excludePath);
+
+        if (!includeRoot) {
+            const foldersOnly = quickPickItems.filter(entry => entry.path.length > 0);
+            quickPickItems.splice(0, quickPickItems.length, ...foldersOnly);
+        }
+
+        if (quickPickItems.length === 0) {
+            void vscode.window.showWarningMessage('No available folders to move the item to.');
+            return;
+        }
+
+        const selection = await vscode.window.showQuickPick(
+            quickPickItems.map(entry => ({
+                label: entry.label,
+                description: entry.path.length === 0 ? 'Top level' : '',
+                detail: entry.path.length ? `Path indexes: ${entry.path.join(' > ')}` : undefined,
+                pathKey: JSON.stringify(entry.path)
+            })),
+            {
+                placeHolder: item.isFolder() ? 'Select destination folder' : 'Select folder for this command'
+            }
+        );
+
+        if (!selection) {
+            return;
+        }
+
+        const target = quickPickItems.find(entry => JSON.stringify(entry.path) === (selection as any).pathKey);
+        if (!target) {
+            return;
+        }
+
+        await treeProvider.moveItemToFolder(item, target.path);
+    });
+
 
     const editCommand = vscode.commands.registerCommand('commandManager.editCommand', async (item: CommandTreeItem) => {
         if (item && item.isCommand()) {
@@ -364,6 +423,9 @@ export function activate(context: vscode.ExtensionContext) {
         duplicateCommand,
         runCommandById,
         pinToStatusBar,
+        moveItemUp,
+        moveItemDown,
+        moveItemToFolder,
         deleteItem,
         openConfig,
         refresh,

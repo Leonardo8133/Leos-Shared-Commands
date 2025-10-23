@@ -2,6 +2,19 @@ import * as vscode from 'vscode';
 import { CommandConfig, Folder, Command, ExecutionState } from '../types';
 import { ConfigManager } from '../config/ConfigManager';
 import { CommandTreeItem } from './CommandTreeItem';
+import {
+  CommandDestination,
+  CommandDescriptor,
+  FolderDestination,
+  FolderDescriptor,
+  DropPosition,
+  getFolderAtPath,
+  getFolderCollection,
+  isAncestorPath,
+  moveCommandInConfig,
+  moveFolderInConfig,
+  pathsEqual
+} from './moveOperations';
 
 const TREE_MIME_TYPE = 'application/vnd.code.tree.commandmanagertree';
 
@@ -226,11 +239,15 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
     });
 
     if (dragItems.length > 0) {
-      dataTransfer.set(TREE_MIME_TYPE, new vscode.DataTransferItem(dragItems));
+      dataTransfer.set(TREE_MIME_TYPE, new vscode.DataTransferItem(JSON.stringify(dragItems)));
     }
   }
 
-  private async handleDrop(target: CommandTreeItem | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
+  private async handleDrop(
+    target: CommandTreeItem | undefined,
+    dataTransfer: vscode.DataTransfer,
+    _token?: vscode.CancellationToken
+  ): Promise<void> {
     const transferItem = dataTransfer.get(TREE_MIME_TYPE);
     if (!transferItem) {
       return;
@@ -257,13 +274,15 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
     const config = this.configManager.getConfig();
     let changed = false;
 
+    const dropPosition = this.extractDropPosition(dataTransfer);
+
     for (const item of dragItems) {
       if (item.kind === 'command') {
-        if (this.moveCommand(config, item, target)) {
+        if (this.moveCommand(config, item, target, dropPosition)) {
           changed = true;
         }
       } else if (item.kind === 'folder') {
-        if (this.moveFolder(config, item, target)) {
+        if (this.moveFolder(config, item, target, dropPosition)) {
           changed = true;
         }
       }
@@ -279,97 +298,66 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
     }
   }
 
-  private moveCommand(config: CommandConfig, item: Extract<DraggedTreeItem, { kind: 'command' }>, target: CommandTreeItem | undefined): boolean {
-    const sourceFolder = this.getFolderAtPath(config, item.path);
-    if (!sourceFolder) {
-      return false;
-    }
+  private moveCommand(
+    config: CommandConfig,
+    item: Extract<DraggedTreeItem, { kind: 'command' }>,
+    target: CommandTreeItem | undefined,
+    dropPosition: DropPosition
+  ): boolean {
+    const descriptor: CommandDescriptor = {
+      path: item.path,
+      commandId: item.commandId
+    };
 
-    const sourceIndex = sourceFolder.commands.findIndex(command => command.id === item.commandId);
-    if (sourceIndex === -1) {
-      return false;
-    }
-
-    const [command] = sourceFolder.commands.splice(sourceIndex, 1);
-    if (!command) {
-      return false;
-    }
-
-    const destination = this.resolveCommandDestination(target, item.path);
+    const destination = this.resolveCommandDestination(target, item.path, dropPosition);
     if (!destination) {
-      sourceFolder.commands.splice(sourceIndex, 0, command);
       return false;
     }
 
-    const destinationFolder = this.getFolderAtPath(config, destination.folderPath);
-    if (!destinationFolder) {
-      sourceFolder.commands.splice(sourceIndex, 0, command);
-      return false;
-    }
-
-    let insertIndex = destination.index ?? destinationFolder.commands.length;
-
-    if (destinationFolder === sourceFolder && insertIndex > sourceIndex) {
-      insertIndex -= 1;
-    }
-
-    insertIndex = Math.min(Math.max(insertIndex, 0), destinationFolder.commands.length);
-    destinationFolder.commands.splice(insertIndex, 0, command);
-    return true;
+    return moveCommandInConfig(config, descriptor, destination);
   }
 
-  private moveFolder(config: CommandConfig, item: Extract<DraggedTreeItem, { kind: 'folder' }>, target: CommandTreeItem | undefined): boolean {
-    const sourcePath = [...item.path];
-    if (target?.isFolder() && this.pathsEqual(target.getFolderPath(), sourcePath)) {
-      return false;
-    }
+  private moveFolder(
+    config: CommandConfig,
+    item: Extract<DraggedTreeItem, { kind: 'folder' }>,
+    target: CommandTreeItem | undefined,
+    dropPosition: DropPosition
+  ): boolean {
+    const descriptor: FolderDescriptor = { path: item.path };
 
-    const removalInfo = this.removeFolderFromConfig(config, sourcePath);
-    const folder = removalInfo.folder;
-    if (!folder) {
-      return false;
-    }
-
-    const destination = this.resolveFolderDestination(target, sourcePath);
+    const destination = this.resolveFolderDestination(target, item.path, dropPosition);
     if (!destination) {
-      this.insertFolderBack(config, removalInfo);
       return false;
     }
 
-    if (this.isAncestorPath(sourcePath, destination.parentPath)) {
-      this.insertFolderBack(config, removalInfo);
+    if (target?.isFolder() && pathsEqual(target.getFolderPath(), item.path) && dropPosition !== 'into') {
       return false;
     }
 
-    let insertIndex = destination.index;
-    if (
-      insertIndex !== undefined &&
-      this.pathsEqual(destination.parentPath, removalInfo.parentPath) &&
-      removalInfo.index < insertIndex
-    ) {
-      insertIndex -= 1;
-    }
-
-    this.insertFolder(config, folder, destination.parentPath, insertIndex);
-    return true;
+    return moveFolderInConfig(config, descriptor, destination);
   }
 
   private resolveCommandDestination(
     target: CommandTreeItem | undefined,
-    fallbackPath: number[]
-  ): { folderPath: number[]; index?: number } | undefined {
+    fallbackPath: number[],
+    dropPosition: DropPosition
+  ): CommandDestination | undefined {
     if (!target) {
-      return { folderPath: [...fallbackPath] };
+      return { folderPath: [...fallbackPath], position: dropPosition };
     }
 
     if (target.isFolder()) {
-      return { folderPath: target.getFolderPath() };
+      return {
+        folderPath: target.getFolderPath(),
+        position: dropPosition === 'after' ? 'after' : 'into'
+      };
     }
 
     if (target.isCommand()) {
       return {
         folderPath: target.getFolderPath(),
-        index: target.getCommandIndex()
+        index: target.getCommandIndex(),
+        position: dropPosition === 'after' ? 'after' : 'before'
       };
     }
 
@@ -378,149 +366,187 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
 
   private resolveFolderDestination(
     target: CommandTreeItem | undefined,
-    sourcePath: number[]
-  ): { parentPath: number[]; index?: number } | undefined {
+    sourcePath: number[],
+    dropPosition: DropPosition
+  ): FolderDestination | undefined {
     if (!target) {
-      return { parentPath: [] };
+      return { parentPath: [], position: dropPosition };
     }
 
     if (target.isCommand()) {
-      return { parentPath: target.getFolderPath() };
+      return { parentPath: target.getFolderPath(), position: dropPosition === 'after' ? 'after' : 'into' };
     }
 
     if (target.isFolder()) {
       const targetPath = target.getFolderPath();
       const targetParentPath = targetPath.slice(0, -1);
-      const sameParent = this.pathsEqual(targetParentPath, sourcePath.slice(0, -1));
+      const sameParent = pathsEqual(targetParentPath, sourcePath.slice(0, -1));
 
       if (sameParent) {
         return {
           parentPath: targetParentPath,
-          index: targetPath[targetPath.length - 1]
+          index: targetPath[targetPath.length - 1],
+          position: dropPosition === 'after' ? 'after' : 'before'
         };
       }
 
-      return { parentPath: targetPath };
+      return {
+        parentPath: targetPath,
+        position: dropPosition === 'after' ? 'after' : 'into'
+      };
     }
 
     return undefined;
   }
 
-  private getFolderAtPath(config: CommandConfig, path: number[]): Folder | undefined {
-    if (path.length === 0) {
-      return undefined;
+  private extractDropPosition(dataTransfer: vscode.DataTransfer): DropPosition {
+    const metadataItem = dataTransfer.get('application/vnd.code.tree.dropmetadata');
+    if (!metadataItem) {
+      return 'before';
     }
 
-    let folders = config.folders;
-    let folder: Folder | undefined;
+    try {
+      const rawValue = metadataItem.value;
+      if (typeof rawValue === 'string') {
+        const parsed = JSON.parse(rawValue) as { dropPosition?: DropPosition };
+        if (parsed?.dropPosition) {
+          return parsed.dropPosition;
+        }
+      } else if (rawValue && typeof rawValue === 'object' && 'dropPosition' in rawValue) {
+        const position = (rawValue as { dropPosition?: DropPosition }).dropPosition;
+        if (position) {
+          return position;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse drop metadata', error);
+    }
 
-    for (const index of path) {
-      folder = folders[index];
-      if (!folder) {
-        return undefined;
+    return 'before';
+  }
+
+  public async moveItemByOffset(item: CommandTreeItem, offset: number): Promise<void> {
+    const config = this.configManager.getConfig();
+    let changed = false;
+
+    if (item.isCommand()) {
+      const folderPath = item.getFolderPath();
+      const folder = getFolderAtPath(config, folderPath);
+      const command = item.getCommand();
+      if (!folder || !command) {
+        return;
       }
 
-      if (!folder.subfolders) {
-        folder.subfolders = [];
+      const currentIndex = folder.commands.findIndex(existing => existing.id === command.id);
+      if (currentIndex === -1) {
+        return;
       }
 
-      folders = folder.subfolders;
-    }
-
-    return folder;
-  }
-
-  private getFolderCollection(config: CommandConfig, parentPath: number[]): Folder[] | undefined {
-    let folders = config.folders;
-
-    if (parentPath.length === 0) {
-      return folders;
-    }
-
-    let folder: Folder | undefined;
-    for (const index of parentPath) {
-      folder = folders[index];
-      if (!folder) {
-        return undefined;
+      const targetIndex = Math.min(Math.max(currentIndex + offset, 0), folder.commands.length - 1);
+      if (targetIndex === currentIndex) {
+        return;
       }
 
-      if (!folder.subfolders) {
-        folder.subfolders = [];
+      changed = moveCommandInConfig(
+        config,
+        { path: folderPath, commandId: command.id },
+        { folderPath, index: targetIndex, position: 'before' }
+      );
+    } else if (item.isFolder()) {
+      const parentPath = item.getFolderPath().slice(0, -1);
+      const collection = getFolderCollection(config, parentPath);
+      const currentIndex = item.getFolderPath()[item.getFolderPath().length - 1];
+      if (!collection || currentIndex === undefined) {
+        return;
       }
 
-      folders = folder.subfolders;
-    }
-
-    return folders;
-  }
-
-  private removeFolderFromConfig(
-    config: CommandConfig,
-    path: number[]
-  ): { folder?: Folder; parentPath: number[]; index: number } {
-    const parentPath = path.slice(0, -1);
-    const index = path[path.length - 1];
-    const collection = this.getFolderCollection(config, parentPath);
-    if (!collection) {
-      return { parentPath, index: -1 };
-    }
-
-    const [folder] = collection.splice(index, 1);
-    return { folder, parentPath, index };
-  }
-
-  private insertFolderBack(
-    config: CommandConfig,
-    info: { folder?: Folder; parentPath: number[]; index: number }
-  ): void {
-    if (!info.folder) {
-      return;
-    }
-
-    const collection = this.getFolderCollection(config, info.parentPath);
-    if (!collection) {
-      return;
-    }
-
-    const insertIndex = Math.min(Math.max(info.index, 0), collection.length);
-    collection.splice(insertIndex, 0, info.folder);
-  }
-
-  private insertFolder(
-    config: CommandConfig,
-    folder: Folder,
-    parentPath: number[],
-    index?: number
-  ): void {
-    const collection = this.getFolderCollection(config, parentPath);
-    if (!collection) {
-      return;
-    }
-
-    const insertIndex = index === undefined ? collection.length : Math.min(Math.max(index, 0), collection.length);
-    collection.splice(insertIndex, 0, folder);
-  }
-
-  private pathsEqual(a: number[], b: number[]): boolean {
-    if (a.length !== b.length) {
-      return false;
-    }
-
-    return a.every((value, index) => value === b[index]);
-  }
-
-  private isAncestorPath(ancestor: number[], descendant: number[]): boolean {
-    if (ancestor.length === 0 || ancestor.length > descendant.length) {
-      return false;
-    }
-
-    for (let i = 0; i < ancestor.length; i++) {
-      if (ancestor[i] !== descendant[i]) {
-        return false;
+      const targetIndex = Math.min(Math.max(currentIndex + offset, 0), collection.length - 1);
+      if (targetIndex === currentIndex) {
+        return;
       }
+
+      changed = moveFolderInConfig(
+        config,
+        { path: item.getFolderPath() },
+        { parentPath, index: targetIndex, position: 'before' }
+      );
     }
 
-    return true;
+    if (changed) {
+      await this.saveAndRefresh(config);
+    }
+  }
+
+  public async moveItemToFolder(item: CommandTreeItem, destinationPath: number[]): Promise<void> {
+    const config = this.configManager.getConfig();
+    let changed = false;
+
+    if (item.isCommand()) {
+      const command = item.getCommand();
+      if (!command) {
+        return;
+      }
+
+      if (destinationPath.length === 0) {
+        void vscode.window.showWarningMessage('Commands must be placed inside a folder.');
+        return;
+      }
+
+      changed = moveCommandInConfig(config, { path: item.getFolderPath(), commandId: command.id }, { folderPath: destinationPath });
+    } else if (item.isFolder()) {
+      if (isAncestorPath(item.getFolderPath(), destinationPath)) {
+        void vscode.window.showWarningMessage('Cannot move a folder into its own subfolder.');
+        return;
+      }
+
+      changed = moveFolderInConfig(
+        config,
+        { path: item.getFolderPath() },
+        { parentPath: destinationPath, position: 'into' }
+      );
+    }
+
+    if (changed) {
+      await this.saveAndRefresh(config);
+    }
+  }
+
+  public async saveAndRefresh(config: CommandConfig): Promise<void> {
+    await this.configManager.saveConfig(config);
+    this.refresh();
+  }
+
+  public async getFolderQuickPickItems(
+    includeRoot: boolean,
+    excludePath?: number[]
+  ): Promise<Array<{ label: string; path: number[] }>> {
+    const config = this.configManager.getConfig();
+    const items: Array<{ label: string; path: number[] }> = [];
+
+    if (includeRoot) {
+      items.push({ label: 'Root', path: [] });
+    }
+
+    const traverse = (folders: Folder[], depth: number, path: number[] = []) => {
+      folders.forEach((folder, index) => {
+        const currentPath = [...path, index];
+        if (excludePath && (pathsEqual(excludePath, currentPath) || isAncestorPath(excludePath, currentPath))) {
+          return;
+        }
+        const indent = depth > 0 ? `${'  '.repeat(depth - 1)}• ` : '';
+        items.push({
+          label: `${indent}${folder.name}`,
+          path: currentPath
+        });
+
+        if (folder.subfolders?.length) {
+          traverse(folder.subfolders, depth + 1, currentPath);
+        }
+      });
+    };
+
+    traverse(config.folders || [], 0, []);
+    return items;
   }
 
   public dispose(): void {

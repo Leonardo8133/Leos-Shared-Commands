@@ -16,6 +16,14 @@ export class CommandTreeItem extends vscode.TreeItem {
       type === 'folder' ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
     );
 
+    if (type === 'folder') {
+      const pathKey = path.length ? path.join('/') : 'root';
+      this.id = `folder:${pathKey}`;
+    } else {
+      const command = item as Command;
+      this.id = `command:${command.id}`;
+    }
+
     this.contextValue = type;
     this.tooltip = this.getTooltip();
     this.iconPath = this.getIcon();
