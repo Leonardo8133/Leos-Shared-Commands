@@ -35,7 +35,7 @@ export interface CommandVariable {
   key: string;
   value: string;
   label?: string;
-  type: 'fixed' | 'options';
+  type: 'fixed' | 'options' | 'file';
   description?: string;
 }
 

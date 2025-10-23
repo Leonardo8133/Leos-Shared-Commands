@@ -100,6 +100,21 @@
         "title": "Pin Command in Status Bar"
       },
       {
+        "command": "commandManager.moveItemUp",
+        "title": "Move Up",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "commandManager.moveItemDown",
+        "title": "Move Down",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "commandManager.moveItemToFolder",
+        "title": "Move to Folder",
+        "icon": "$(folder-move)"
+      },
+      {
         "command": "commandManager.deleteItem",
         "title": "Delete",
         "icon": "$(trash)"
@@ -243,9 +258,24 @@
           "group": "2_modify@1"
         },
         {
+          "command": "commandManager.moveItemUp",
+          "when": "view == commandManagerTree && (viewItem == command || viewItem == folder)",
+          "group": "2_modify@2"
+        },
+        {
+          "command": "commandManager.moveItemDown",
+          "when": "view == commandManagerTree && (viewItem == command || viewItem == folder)",
+          "group": "2_modify@3"
+        },
+        {
+          "command": "commandManager.moveItemToFolder",
+          "when": "view == commandManagerTree && (viewItem == command || viewItem == folder)",
+          "group": "2_modify@4"
+        },
+        {
           "command": "commandManager.deleteItem",
           "when": "view == commandManagerTree",
-          "group": "2_modify@2"
+          "group": "2_modify@5"
         },
         {
           "command": "commandManager.newCommand",
