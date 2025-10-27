@@ -2,7 +2,7 @@
   "name": "command-manager",
   "displayName": "Command Manager",
   "description": "Manage and execute commands with variables, chains, and flexible terminal options",
-  "version": "1.0.0",  
+  "version": "1.0.0",
   "publisher": "LeonardoSouza",
   "author": {
     "name": "Leonardo de Souza Chaves",
@@ -324,13 +324,19 @@
       "properties": {
         "commandManager.documentationHub.viewMode": {
           "type": "string",
-          "enum": ["tree", "flat"],
+          "enum": [
+            "tree",
+            "flat"
+          ],
           "default": "tree",
           "description": "Choose whether the documentation hub displays markdown files in a folder tree or a flat list."
         },
         "commandManager.documentationHub.position": {
           "type": "string",
-          "enum": ["top", "bottom"],
+          "enum": [
+            "top",
+            "bottom"
+          ],
           "default": "bottom",
           "description": "Control whether the documentation hub appears above or below the command list in the Command Manager view container."
         }
@@ -348,7 +354,8 @@
     "test:watch": "npm run watch && npm run test",
     "test:playwright": "npm run compile && npx playwright test",
     "test:ui": "npx wdio run wdio.conf.js",
-    "test:all": "npm test && npm run test:playwright && npm run test:ui"
+    "test:all": "npm test && npm run test:playwright && npm run test:ui",
+    "test:vet": "vscode-extension-tester --config ./et-tests/mocha-vscode.json"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
@@ -368,6 +375,7 @@
     "playwright": "^1.56.1",
     "typescript": "^5.3.0",
     "wdio-vscode-service": "^6.1.4",
-    "webdriverio": "^8.46.0"
+    "webdriverio": "^8.46.0",
+    "vscode-extension-tester": "^6.0.0"
   }
 }

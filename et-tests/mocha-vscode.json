@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/redhat-developer/vscode-extension-tester/main/resources/mocha-vscode.schema.json",
+  "extensionDevelopmentPath": "./",
+  "workspace": "./et-tests/fixtures/python-flowchart",
+  "tests": [
+    "./et-tests/tests/sample-smoke.spec.js",
+    "./et-tests/tests/generate-flowchart.spec.js"
+  ],
+  "mocha": {
+    "timeout": 240000,
+    "retries": 0,
+    "slow": 60000,
+    "reporter": "spec"
+  }
+}
