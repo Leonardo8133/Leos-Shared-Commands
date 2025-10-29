@@ -38,18 +38,22 @@ const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const DocumentationTreeItem_1 = require("./DocumentationTreeItem");
 class DocumentationTreeProvider {
-    constructor(configManager) {
+    constructor(configManager, storage) {
         this.configManager = configManager;
+        this.storage = storage;
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
         this.markdownFiles = [];
         this.searchQuery = '';
         this.viewMode = 'tree';
         this.hiddenItems = new Set();
+        this.storageKey = 'documentationHub.hiddenItems';
         void this.initialize();
     }
     async initialize() {
         this.viewMode = this.getConfiguredViewMode();
+        const storedHidden = this.storage.get(this.storageKey, []);
+        this.hiddenItems = new Set(storedHidden);
         await this.refreshMarkdownFiles();
         this.setupFileWatcher();
         vscode.workspace.onDidChangeConfiguration(event => {
@@ -186,7 +190,7 @@ class DocumentationTreeProvider {
             const sortedFolders = Array.from(node.children.values()).sort((a, b) => a.name.localeCompare(b.name));
             for (const folder of sortedFolders) {
                 const children = [...buildItems(folder), ...folder.files.map(file => this.createFileItem(file))];
-                const item = new DocumentationTreeItem_1.DocumentationTreeItem('folder', folder.name, vscode.TreeItemCollapsibleState.Collapsed, undefined, children);
+                const item = new DocumentationTreeItem_1.DocumentationTreeItem('folder', folder.name, vscode.TreeItemCollapsibleState.Collapsed, undefined, children, folder.path);
                 item.iconPath = new vscode.ThemeIcon('folder');
                 item.description = folder.path;
                 // Only add folder if it's not hidden and has visible children
@@ -356,15 +360,18 @@ class DocumentationTreeProvider {
     hideItem(item) {
         const key = this.getItemKey(item);
         this.hiddenItems.add(key);
+        void this.persistHiddenItems();
         this.refresh();
     }
     unhideItem(item) {
         const key = this.getItemKey(item);
         this.hiddenItems.delete(key);
+        void this.persistHiddenItems();
         this.refresh();
     }
     unhideAll() {
         this.hiddenItems.clear();
+        void this.persistHiddenItems();
         this.refresh();
     }
     isHidden(item) {
@@ -376,9 +383,13 @@ class DocumentationTreeProvider {
             return `file:${item.metadata.relativePath}`;
         }
         else if (item.type === 'folder') {
-            return `folder:${item.labelText}`;
+            const identifier = item.folderPath || item.labelText;
+            return `folder:${identifier}`;
         }
         return `search:${item.labelText}`;
+    }
+    async persistHiddenItems() {
+        await this.storage.update(this.storageKey, Array.from(this.hiddenItems));
     }
     dispose() {
         this._onDidChangeTreeData.dispose();

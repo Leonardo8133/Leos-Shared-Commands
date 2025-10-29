@@ -1,47 +1,17 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activate = activate;
-exports.deactivate = deactivate;
-const vscode = __importStar(require("vscode"));
+exports.deactivate = exports.activate = void 0;
+const vscode = require("vscode");
 const ConfigManager_1 = require("./config/ConfigManager");
 const CommandTreeProvider_1 = require("./treeView/CommandTreeProvider");
 const CommandExecutor_1 = require("./execution/CommandExecutor");
 const WebviewManager_1 = require("./ui/webview/WebviewManager");
 const DocumentationTreeProvider_1 = require("./documentation/DocumentationTreeProvider");
 const StatusBarManager_1 = require("./ui/StatusBarManager");
+const TestRunnerTreeProvider_1 = require("./testRunner/TestRunnerTreeProvider");
+const TestRunnerTreeItem_1 = require("./testRunner/TestRunnerTreeItem");
+const TestRunnerCodeLensProvider_1 = require("./testRunner/TestRunnerCodeLensProvider");
+const TestRunnerManager_1 = require("./testRunner/TestRunnerManager");
 async function applyDocumentationViewPosition(position) {
     try {
         if (position === 'top') {
@@ -64,30 +34,41 @@ async function applyDocumentationViewPosition(position) {
     }
 }
 function activate(context) {
-    console.log('Command Manager extension is now active!');
-    // Initialize managers
+    console.log('Task and Documentation Hub extension is now active!');
     const configManager = ConfigManager_1.ConfigManager.getInstance();
     const commandExecutor = CommandExecutor_1.CommandExecutor.getInstance();
     const webviewManager = WebviewManager_1.WebviewManager.getInstance();
-    // Initialize configuration
     configManager.initialize();
-    // Create tree provider
     const treeProvider = new CommandTreeProvider_1.CommandTreeProvider();
     const commandTreeView = vscode.window.createTreeView('commandManagerTree', {
         treeDataProvider: treeProvider,
         dragAndDropController: treeProvider.dragAndDropController
     });
-    const documentationProvider = new DocumentationTreeProvider_1.DocumentationTreeProvider(configManager);
+    const documentationProvider = new DocumentationTreeProvider_1.DocumentationTreeProvider(configManager, context.workspaceState);
     const documentationTreeView = vscode.window.createTreeView('documentationHubTree', {
         treeDataProvider: documentationProvider,
         showCollapseAll: true
     });
-    // Set tree provider in executor for icon updates
+    const testRunnerManager = TestRunnerManager_1.TestRunnerManager.getInstance();
+    const testRunnerProvider = new TestRunnerTreeProvider_1.TestRunnerTreeProvider(testRunnerManager);
+    const testRunnerTreeView = vscode.window.createTreeView('testRunnerTree', {
+        treeDataProvider: testRunnerProvider,
+        showCollapseAll: true
+    });
+    const codeLensProvider = new TestRunnerCodeLensProvider_1.TestRunnerCodeLensProvider(testRunnerManager);
+    const codeLensSelectors = [
+        { language: 'javascript', scheme: 'file' },
+        { language: 'javascriptreact', scheme: 'file' },
+        { language: 'typescript', scheme: 'file' },
+        { language: 'typescriptreact', scheme: 'file' },
+        { language: 'python', scheme: 'file' }
+    ];
+    const codeLensRegistration = vscode.languages.registerCodeLensProvider(codeLensSelectors, codeLensProvider);
     commandExecutor.setTreeProvider(treeProvider);
     commandExecutor.setWebviewManager(webviewManager);
     webviewManager.setTreeProvider(treeProvider);
     const statusBarManager = new StatusBarManager_1.StatusBarManager(context, treeProvider, configManager);
-    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView);
+    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView, testRunnerProvider, testRunnerTreeView, codeLensProvider, codeLensRegistration);
     const applyPosition = () => {
         const configuration = vscode.workspace.getConfiguration('commandManager.documentationHub');
         const desiredPosition = configuration.get('position', 'bottom');
@@ -100,7 +81,6 @@ function activate(context) {
         }
     });
     context.subscriptions.push(configurationListener);
-    // Register commands
     const runCommand = vscode.commands.registerCommand('commandManager.runCommand', async (item) => {
         if (item && item.isCommand()) {
             const command = item.getCommand();
@@ -140,6 +120,24 @@ function activate(context) {
             return;
         }
         await statusBarManager.togglePin(command);
+    });
+    const moveItemUp = vscode.commands.registerCommand('commandManager.moveItemUp', async (item) => {
+        if (!item) {
+            return;
+        }
+        await treeProvider.moveItemByOffset(item, -1);
+    });
+    const moveItemDown = vscode.commands.registerCommand('commandManager.moveItemDown', async (item) => {
+        if (!item) {
+            return;
+        }
+        await treeProvider.moveItemByOffset(item, 1);
+    });
+    const moveItemToFolder = vscode.commands.registerCommand('commandManager.moveItemToFolder', async (item) => {
+        if (!item) {
+            return;
+        }
+        await treeProvider.moveItemToFolder(item);
     });
     const editCommand = vscode.commands.registerCommand('commandManager.editCommand', async (item) => {
         if (item && item.isCommand()) {
@@ -183,12 +181,12 @@ function activate(context) {
         if (item && item.isCommand()) {
             const command = item.getCommand();
             if (command) {
-                const newCommand = {
+                const duplicate = {
                     ...command,
                     id: `${command.id}-copy-${Date.now()}`,
                     label: `${command.label} (Copy)`
                 };
-                webviewManager.showCommandEditor(newCommand, {
+                webviewManager.showCommandEditor(duplicate, {
                     folderPath: item.getFolderPath()
                 });
             }
@@ -198,60 +196,18 @@ function activate(context) {
         if (item && item.isFolder()) {
             const folder = item.getFolder();
             if (folder) {
-                webviewManager.showFolderEditor(folder, { path: item.getFolderPath() });
-            }
-        }
-    });
-    const quickRun = vscode.commands.registerCommand('commandManager.quickRun', async () => {
-        const commands = await treeProvider.getAllCommands();
-        if (commands.length === 0) {
-            vscode.window.showInformationMessage('No commands configured yet. Create one from the Command Manager view.');
-            return;
-        }
-        const selection = await vscode.window.showQuickPick(commands.map(command => ({
-            label: command.label,
-            description: command.description || '',
-            detail: command.command,
-            command
-        })), {
-            placeHolder: 'Select a command to run'
-        });
-        if (selection?.command) {
-            try {
-                await commandExecutor.executeCommandWithProgress(selection.command);
-            }
-            catch (error) {
-                vscode.window.showErrorMessage(`Failed to execute command: ${error}`);
+                webviewManager.showFolderEditor(folder, {
+                    path: item.getFolderPath(),
+                    parentPath: item.parent?.getFolderPath()
+                });
             }
         }
     });
     const deleteItem = vscode.commands.registerCommand('commandManager.deleteItem', async (item) => {
-        if (!item)
+        if (!item) {
             return;
-        const confirm = await vscode.window.showWarningMessage(`Are you sure you want to delete "${item.label}"?`, { modal: true }, 'Delete');
-        if (confirm === 'Delete') {
-            try {
-                const config = configManager.getConfig();
-                if (item.isCommand()) {
-                    const command = item.getCommand();
-                    if (command) {
-                        deleteCommandFromConfig(config, command.id);
-                    }
-                }
-                else if (item.isFolder()) {
-                    const folder = item.getFolder();
-                    if (folder) {
-                        deleteFolderFromConfig(config, folder.name);
-                    }
-                }
-                await configManager.saveConfig(config);
-                treeProvider.refresh();
-                vscode.window.showInformationMessage('Item deleted successfully');
-            }
-            catch (error) {
-                vscode.window.showErrorMessage(`Failed to delete item: ${error}`);
-            }
         }
+        await treeProvider.deleteItem(item);
     });
     const openConfig = vscode.commands.registerCommand('commandManager.openConfig', async () => {
         await configManager.openConfigFile();
@@ -259,11 +215,31 @@ function activate(context) {
     const refresh = vscode.commands.registerCommand('commandManager.refresh', () => {
         treeProvider.refresh();
     });
-    // Webview commands
     const openConfiguration = vscode.commands.registerCommand('commandManager.openConfiguration', () => {
         webviewManager.showConfigurationManager();
     });
-    // Import/Export commands
+    const quickRun = vscode.commands.registerCommand('commandManager.quickRun', async () => {
+        const commands = await treeProvider.getAllCommands();
+        if (!commands.length) {
+            vscode.window.showInformationMessage('No commands configured yet. Create one from the Task and Documentation Hub view.');
+            return;
+        }
+        const items = commands.map(command => ({
+            label: command.label,
+            description: command.description,
+            commandId: command.id
+        }));
+        const selection = await vscode.window.showQuickPick(items, {
+            placeHolder: 'Select a command to run'
+        });
+        if (!selection) {
+            return;
+        }
+        const command = commands.find(cmd => cmd.id === selection.commandId);
+        if (command) {
+            await commandExecutor.executeCommandWithProgress(command);
+        }
+    });
     const importCommands = vscode.commands.registerCommand('commandManager.importCommands', async () => {
         const fileUri = await vscode.window.showOpenDialog({
             canSelectFiles: true,
@@ -300,56 +276,7 @@ function activate(context) {
             }
         }
     });
-    // Helper methods for deletion
-    function deleteCommandFromConfig(config, commandId) {
-        for (const folder of config.folders) {
-            const commandIndex = folder.commands.findIndex((cmd) => cmd.id === commandId);
-            if (commandIndex !== -1) {
-                folder.commands.splice(commandIndex, 1);
-                return;
-            }
-            if (folder.subfolders) {
-                deleteCommandFromSubfolders(folder.subfolders, commandId);
-            }
-        }
-    }
-    function deleteCommandFromSubfolders(subfolders, commandId) {
-        for (const subfolder of subfolders) {
-            const commandIndex = subfolder.commands.findIndex((cmd) => cmd.id === commandId);
-            if (commandIndex !== -1) {
-                subfolder.commands.splice(commandIndex, 1);
-                return;
-            }
-            if (subfolder.subfolders) {
-                deleteCommandFromSubfolders(subfolder.subfolders, commandId);
-            }
-        }
-    }
-    function deleteFolderFromConfig(config, folderName) {
-        const folderIndex = config.folders.findIndex((folder) => folder.name === folderName);
-        if (folderIndex !== -1) {
-            config.folders.splice(folderIndex, 1);
-            return;
-        }
-        deleteFolderFromSubfolders(config.folders, folderName);
-    }
-    function deleteFolderFromSubfolders(folders, folderName) {
-        for (const folder of folders) {
-            if (folder.subfolders) {
-                const subfolderIndex = folder.subfolders.findIndex((subfolder) => subfolder.name === folderName);
-                if (subfolderIndex !== -1) {
-                    folder.subfolders.splice(subfolderIndex, 1);
-                    return;
-                }
-                deleteFolderFromSubfolders(folder.subfolders, folderName);
-            }
-        }
-    }
-    // Register context menu for tree view
-    vscode.window.registerTreeDataProvider('commandManagerTree', treeProvider);
-    // Add all commands to context
-    context.subscriptions.push(runCommand, editCommand, newCommand, newFolder, editFolder, duplicateCommand, runCommandById, pinToStatusBar, deleteItem, openConfig, refresh, openConfiguration, quickRun, importCommands, exportCommands);
-    // Documentation hub commands
+    context.subscriptions.push(runCommand, editCommand, newCommand, newFolder, duplicateCommand, runCommandById, pinToStatusBar, moveItemUp, moveItemDown, moveItemToFolder, deleteItem, openConfig, refresh, openConfiguration, quickRun, importCommands, exportCommands);
     const openDocumentation = vscode.commands.registerCommand('documentationHub.openFile', async (uri) => {
         await documentationProvider.openFile(uri);
     });
@@ -385,12 +312,140 @@ function activate(context) {
         documentationProvider.unhideAll();
     });
     context.subscriptions.push(openDocumentation, copyDocumentationPath, extractDocumentationCommands, searchDocumentation, toggleDocumentationViewMode, refreshDocumentation, openDocumentationSection, hideDocumentationItem, unhideDocumentationItem, unhideAllDocumentation);
-    // Show welcome message
-    vscode.window.showInformationMessage('Command Manager extension activated! Use Ctrl+Shift+C for quick access.');
+    const openTestRunnerConfiguration = vscode.commands.registerCommand('testRunner.openConfiguration', (item) => {
+        const configId = item && item.isConfig() ? item.config.id : undefined;
+        webviewManager.showTestRunnerEditor(configId);
+    });
+    const runAllTestsCommand = vscode.commands.registerCommand('testRunner.runAll', async () => {
+        await testRunnerManager.runAll();
+    });
+    const runConfigurationCommand = vscode.commands.registerCommand('testRunner.runConfiguration', async (item) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+        await testRunnerManager.runAll(item.config);
+    });
+    const moveTestRunnerUp = vscode.commands.registerCommand('testRunner.moveUp', async (item) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+        const configs = testRunnerManager.getConfigs();
+        const index = configs.findIndex(config => config.id === item.config.id);
+        if (index > 0) {
+            await testRunnerManager.moveConfig(item.config.id, index - 1);
+        }
+    });
+    const moveTestRunnerDown = vscode.commands.registerCommand('testRunner.moveDown', async (item) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+        const configs = testRunnerManager.getConfigs();
+        const index = configs.findIndex(config => config.id === item.config.id);
+        if (index !== -1 && index < configs.length - 1) {
+            await testRunnerManager.moveConfig(item.config.id, index + 1);
+        }
+    });
+    const moveTestRunnerTo = vscode.commands.registerCommand('testRunner.moveTo', async (item) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+        const configs = testRunnerManager.getConfigs();
+        const picks = configs.map((config, idx) => ({
+            label: `${idx + 1}. ${config.title}`,
+            description: config.id === item.config.id ? 'Current position' : undefined,
+            index: idx
+        }));
+        const selection = await vscode.window.showQuickPick(picks, {
+            placeHolder: 'Select the new position for this configuration'
+        });
+        if (!selection) {
+            return;
+        }
+        await testRunnerManager.moveConfig(item.config.id, selection.index);
+    });
+    const hideTestRunnerConfiguration = vscode.commands.registerCommand('testRunner.hideConfiguration', async (item) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+        await testRunnerManager.setActivation(item.config.id, false);
+    });
+    const unhideTestRunnerConfiguration = vscode.commands.registerCommand('testRunner.unhideConfiguration', async (item) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+        await testRunnerManager.setActivation(item.config.id, true);
+    });
+    const runSingleTestCommand = vscode.commands.registerCommand('testRunner.runTest', async (arg1, arg2) => {
+        let config;
+        let test;
+        if (arg1 instanceof TestRunnerTreeItem_1.TestRunnerTreeItem) {
+            if (!arg1.isTest() || !arg1.test) {
+                return;
+            }
+            config = arg1.config;
+            test = arg1.test;
+        }
+        else {
+            config = arg1;
+            test = arg2;
+        }
+        if (!config || !test) {
+            return;
+        }
+        await testRunnerManager.runTest(config, test.label, {
+            file: test.file.fsPath,
+            line: String(test.line + 1)
+        });
+    });
+    const ignoreTestCommand = vscode.commands.registerCommand('testRunner.ignoreTest', async (arg1, arg2) => {
+        let config;
+        let test;
+        if (arg1 instanceof TestRunnerTreeItem_1.TestRunnerTreeItem) {
+            if (!arg1.isTest() || !arg1.test) {
+                return;
+            }
+            config = arg1.config;
+            test = arg1.test;
+        }
+        else {
+            config = arg1;
+            test = arg2;
+        }
+        if (!config || !test) {
+            return;
+        }
+        await testRunnerManager.addIgnoredTest(config.id, test.label);
+        vscode.window.showInformationMessage(`Ignored "${test.label}" in ${config.title}.`);
+    });
+    const gotoTestCommand = vscode.commands.registerCommand('testRunner.gotoTest', async (arg1, arg2) => {
+        let test;
+        if (arg1 instanceof TestRunnerTreeItem_1.TestRunnerTreeItem) {
+            if (!arg1.isTest() || !arg1.test) {
+                return;
+            }
+            test = arg1.test;
+        }
+        else {
+            test = arg2;
+        }
+        if (!test) {
+            return;
+        }
+        const document = await vscode.workspace.openTextDocument(test.file);
+        const editor = await vscode.window.showTextDocument(document);
+        const position = new vscode.Position(test.line, 0);
+        editor.selection = new vscode.Selection(position, position);
+        editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+    });
+    const expandAllTestRunners = vscode.commands.registerCommand('testRunner.expandAll', async () => {
+        await vscode.commands.executeCommand('workbench.actions.treeView.testRunnerTree.expandAll');
+    });
+    context.subscriptions.push(openTestRunnerConfiguration, runAllTestsCommand, runConfigurationCommand, moveTestRunnerUp, moveTestRunnerDown, moveTestRunnerTo, hideTestRunnerConfiguration, unhideTestRunnerConfiguration, runSingleTestCommand, ignoreTestCommand, gotoTestCommand, expandAllTestRunners);
+    vscode.window.showInformationMessage('Task and Documentation Hub extension activated! Use Ctrl+Shift+C for quick access.');
 }
+exports.activate = activate;
 function deactivate() {
-    // Clean up resources
     const configManager = ConfigManager_1.ConfigManager.getInstance();
     configManager.dispose();
 }
-//# sourceMappingURL=extension.js.map
+exports.deactivate = deactivate;

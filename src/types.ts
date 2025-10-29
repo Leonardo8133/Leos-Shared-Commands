@@ -3,6 +3,7 @@ export interface CommandConfig {
   globalVariables?: VariablePreset[];
   sharedVariables?: SharedVariable[];
   sharedLists?: SharedList[];
+  testRunners?: TestRunnerConfig[];
   version?: number;
   lastModified?: string;
 }
@@ -37,6 +38,19 @@ export interface CommandVariable {
   label?: string;
   type: 'fixed' | 'options' | 'file';
   description?: string;
+}
+
+export interface TestRunnerConfig {
+  id: string;
+  activated: boolean;
+  title: string;
+  fileType: 'javascript' | 'typescript' | 'python';
+  workingDirectory?: string;
+  fileNamePattern: string;
+  testNamePattern: string;
+  ignoreList?: string;
+  runTestCommand: string;
+  terminalName?: string;
 }
 
 

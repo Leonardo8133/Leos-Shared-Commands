@@ -5,9 +5,23 @@ import { TerminalConfig } from '../types';
 export class TerminalManager {
   private static instance: TerminalManager;
   private terminals: Map<string, vscode.Terminal> = new Map();
+  private readonly closeListener: vscode.Disposable;
   private customRunner?: (command: string, config: TerminalConfig) => Promise<void>;
 
-  private constructor() {}
+  private constructor() {
+    this.closeListener = vscode.window.onDidCloseTerminal(terminal => {
+      const entriesToDelete: string[] = [];
+      for (const [name, trackedTerminal] of this.terminals.entries()) {
+        if (trackedTerminal === terminal) {
+          entriesToDelete.push(name);
+        }
+      }
+
+      for (const name of entriesToDelete) {
+        this.terminals.delete(name);
+      }
+    });
+  }
 
   public static getInstance(): TerminalManager {
     if (!TerminalManager.instance) {
@@ -44,26 +58,32 @@ export class TerminalManager {
     const activeTerminal = vscode.window.activeTerminal;
     if (!activeTerminal) {
       // Create a new terminal if none exists
-      const terminal = vscode.window.createTerminal(config.name || 'Command Manager');
-      terminal.show();
-      await this.executeInTerminal(terminal, command, config);
+      const baseName = config.name || 'Task and Documentation Hub';
+      const terminalInstance = this.createManagedTerminal(baseName);
+      this.terminals.set(baseName, terminalInstance);
+      terminalInstance.show();
+      await this.executeInTerminal(terminalInstance, command, config);
     } else {
       await this.executeInTerminal(activeTerminal, command, config);
     }
   }
 
   private async executeInNewTerminal(command: string, config: TerminalConfig): Promise<void> {
-    const terminalName = config.name || 'Command Manager';
-    
+    const terminalName = config.name || 'Task and Documentation Hub';
+
     // Try to reuse existing terminal with the same name
     let terminal = this.terminals.get(terminalName);
-    
+
+    if (terminal && this.isTerminalDisposed(terminal)) {
+      this.terminals.delete(terminalName);
+      terminal = undefined;
+    }
+
     if (!terminal) {
-      // Create new terminal if none exists with this name
-      terminal = vscode.window.createTerminal(terminalName);
+      terminal = this.createManagedTerminal(terminalName);
       this.terminals.set(terminalName, terminal);
     }
-    
+
     terminal.show();
     await this.executeInTerminal(terminal, command, config);
   }
@@ -139,5 +159,26 @@ export class TerminalManager {
 
   public setRunner(runner?: (command: string, config: TerminalConfig) => Promise<void>): void {
     this.customRunner = runner;
+  }
+
+  private isTerminalDisposed(terminal: vscode.Terminal): boolean {
+    return typeof terminal.exitStatus !== 'undefined';
+  }
+
+  private createManagedTerminal(baseName: string): vscode.Terminal {
+    const existingNames = new Set(vscode.window.terminals.map(term => term.name));
+
+    if (!existingNames.has(baseName)) {
+      return vscode.window.createTerminal(baseName);
+    }
+
+    let attempt = 1;
+    let candidate = `${baseName} #${attempt}`;
+    while (existingNames.has(candidate)) {
+      attempt += 1;
+      candidate = `${baseName} #${attempt}`;
+    }
+
+    return vscode.window.createTerminal(candidate);
   }
 }

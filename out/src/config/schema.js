@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getDefaultConfig = getDefaultConfig;
-exports.validateConfig = validateConfig;
+exports.validateConfig = exports.getDefaultConfig = void 0;
 function getDefaultConfig() {
     return {
         folders: [
@@ -12,10 +11,10 @@ function getDefaultConfig() {
                     {
                         id: 'hello-world',
                         label: 'Echo Hello',
-                        command: 'echo "Hello from Command Manager"',
+                        command: 'echo "Hello from Task and Documentation Hub"',
                         terminal: {
                             type: 'vscode-new',
-                            name: 'Command Manager'
+                            name: 'Task and Documentation Hub'
                         },
                         description: 'Sample command that echoes a welcome message'
                     },
@@ -39,6 +38,7 @@ function getDefaultConfig() {
                 ]
             }
         ],
+        testRunners: [],
         sharedVariables: [
             {
                 key: 'PROJECT_ROOT',
@@ -57,11 +57,15 @@ function getDefaultConfig() {
         ]
     };
 }
+exports.getDefaultConfig = getDefaultConfig;
 function validateConfig(config) {
     const errors = [];
     if (!config || typeof config !== 'object') {
         errors.push('Config must be an object');
         return { valid: false, errors };
+    }
+    if (config.testRunners && !Array.isArray(config.testRunners)) {
+        errors.push('Config testRunners must be an array when provided');
     }
     if (!Array.isArray(config.folders)) {
         errors.push('Config must have a folders array');
@@ -105,14 +109,44 @@ function validateConfig(config) {
                         if (!variable.key || typeof variable.key !== 'string') {
                             errors.push(`Variable ${variableIndex} in command ${commandIndex} must have a key`);
                         }
-                        if (variable.type !== 'fixed' && variable.type !== 'options') {
-                            errors.push(`Variable ${variableIndex} in command ${commandIndex} must be of type "fixed" or "options"`);
+                        if (variable.type !== 'fixed' && variable.type !== 'options' && variable.type !== 'file') {
+                            errors.push(`Variable ${variableIndex} in command ${commandIndex} must be of type "fixed", "options", or "file"`);
                         }
                     });
                 }
             });
         });
     }
+    if (Array.isArray(config.testRunners)) {
+        config.testRunners.forEach((runner, index) => {
+            if (!runner || typeof runner !== 'object') {
+                errors.push(`Test runner ${index} must be an object`);
+                return;
+            }
+            if (typeof runner.id !== 'string' || runner.id.trim() === '') {
+                errors.push(`Test runner ${index} must have an id`);
+            }
+            if (typeof runner.title !== 'string' || runner.title.trim() === '') {
+                errors.push(`Test runner ${index} must have a title`);
+            }
+            if (typeof runner.activated !== 'boolean') {
+                errors.push(`Test runner ${index} must have an activated flag`);
+            }
+            if (!['javascript', 'typescript', 'python'].includes(runner.fileType)) {
+                errors.push(`Test runner ${index} must have a valid file type`);
+            }
+            if (typeof runner.fileNamePattern !== 'string') {
+                errors.push(`Test runner ${index} must have a file name pattern string`);
+            }
+            if (typeof runner.testNamePattern !== 'string') {
+                errors.push(`Test runner ${index} must have a test name pattern string`);
+            }
+            if (typeof runner.runTestCommand !== 'string' || runner.runTestCommand.trim() === '') {
+                errors.push(`Test runner ${index} must have a run test command`);
+            }
+        });
+    }
     return { valid: errors.length === 0, errors };
 }
+exports.validateConfig = validateConfig;
 //# sourceMappingURL=schema.js.map

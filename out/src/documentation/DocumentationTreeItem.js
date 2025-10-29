@@ -36,12 +36,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DocumentationTreeItem = void 0;
 const vscode = __importStar(require("vscode"));
 class DocumentationTreeItem extends vscode.TreeItem {
-    constructor(type, labelText, collapsibleState, metadata, children) {
+    constructor(type, labelText, collapsibleState, metadata, children, folderPath) {
         super(labelText, collapsibleState);
         this.type = type;
         this.labelText = labelText;
         this.metadata = metadata;
         this.children = children;
+        this.folderPath = folderPath;
         this.contextValue = this.getContextValue();
         this.tooltip = this.getTooltip();
         if (type === 'file' && metadata) {

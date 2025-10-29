@@ -6,6 +6,11 @@ import { WebviewManager } from './ui/webview/WebviewManager';
 import { CommandTreeItem } from './treeView/CommandTreeItem';
 import { DocumentationTreeProvider } from './documentation/DocumentationTreeProvider';
 import { StatusBarManager } from './ui/StatusBarManager';
+import { TestRunnerConfig } from './types';
+import { TestRunnerTreeProvider } from './testRunner/TestRunnerTreeProvider';
+import { TestRunnerTreeItem } from './testRunner/TestRunnerTreeItem';
+import { TestRunnerCodeLensProvider } from './testRunner/TestRunnerCodeLensProvider';
+import { DiscoveredTest, TestRunnerManager } from './testRunner/TestRunnerManager';
 
 type DocumentationPosition = 'top' | 'bottom';
 
@@ -30,7 +35,7 @@ async function applyDocumentationViewPosition(position: DocumentationPosition): 
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Command Manager extension is now active!');
+    console.log('Task and Documentation Hub extension is now active!');
 
     // Initialize managers
     const configManager = ConfigManager.getInstance();
@@ -47,11 +52,28 @@ export function activate(context: vscode.ExtensionContext) {
         dragAndDropController: treeProvider.dragAndDropController
     });
 
-    const documentationProvider = new DocumentationTreeProvider(configManager);
+    const documentationProvider = new DocumentationTreeProvider(configManager, context.workspaceState);
     const documentationTreeView = vscode.window.createTreeView('documentationHubTree', {
         treeDataProvider: documentationProvider,
         showCollapseAll: true
     });
+
+    const testRunnerManager = TestRunnerManager.getInstance();
+    const testRunnerProvider = new TestRunnerTreeProvider(testRunnerManager);
+    const testRunnerTreeView = vscode.window.createTreeView('testRunnerTree', {
+        treeDataProvider: testRunnerProvider,
+        showCollapseAll: true
+    });
+
+    const codeLensProvider = new TestRunnerCodeLensProvider(testRunnerManager);
+    const codeLensSelectors: vscode.DocumentSelector = [
+        { language: 'javascript', scheme: 'file' },
+        { language: 'javascriptreact', scheme: 'file' },
+        { language: 'typescript', scheme: 'file' },
+        { language: 'typescriptreact', scheme: 'file' },
+        { language: 'python', scheme: 'file' }
+    ];
+    const codeLensRegistration = vscode.languages.registerCodeLensProvider(codeLensSelectors, codeLensProvider);
 
     // Set tree provider in executor for icon updates
     commandExecutor.setTreeProvider(treeProvider);
@@ -59,7 +81,7 @@ export function activate(context: vscode.ExtensionContext) {
     webviewManager.setTreeProvider(treeProvider);
 
     const statusBarManager = new StatusBarManager(context, treeProvider, configManager);
-    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView);
+    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView, testRunnerProvider, testRunnerTreeView, codeLensProvider, codeLensRegistration);
 
     const applyPosition = () => {
         const configuration = vscode.workspace.getConfiguration('commandManager.documentationHub');
@@ -248,7 +270,7 @@ export function activate(context: vscode.ExtensionContext) {
     const quickRun = vscode.commands.registerCommand('commandManager.quickRun', async () => {
         const commands = await treeProvider.getAllCommands();
         if (commands.length === 0) {
-            vscode.window.showInformationMessage('No commands configured yet. Create one from the Command Manager view.');
+            vscode.window.showInformationMessage('No commands configured yet. Create one from the Task and Documentation Hub view.');
             return;
         }
 
@@ -435,6 +457,193 @@ export function activate(context: vscode.ExtensionContext) {
         exportCommands
     );
 
+    const openTestRunnerConfiguration = vscode.commands.registerCommand(
+        'testRunner.openConfiguration',
+        (item?: TestRunnerTreeItem) => {
+            const configId = item && item.isConfig() ? item.config.id : undefined;
+            webviewManager.showTestRunnerEditor(configId);
+        }
+    );
+
+    const runAllTestsCommand = vscode.commands.registerCommand('testRunner.runAll', async () => {
+        await testRunnerManager.runAll();
+    });
+
+    const runConfigurationCommand = vscode.commands.registerCommand(
+        'testRunner.runConfiguration',
+        async (item: TestRunnerTreeItem) => {
+            if (!item || !item.isConfig()) {
+                return;
+            }
+            await testRunnerManager.runAll(item.config);
+        }
+    );
+
+    const moveTestRunnerUp = vscode.commands.registerCommand('testRunner.moveUp', async (item: TestRunnerTreeItem) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+
+        const configs = testRunnerManager.getConfigs();
+        const index = configs.findIndex(config => config.id === item.config.id);
+        if (index > 0) {
+            await testRunnerManager.moveConfig(item.config.id, index - 1);
+        }
+    });
+
+    const moveTestRunnerDown = vscode.commands.registerCommand('testRunner.moveDown', async (item: TestRunnerTreeItem) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+
+        const configs = testRunnerManager.getConfigs();
+        const index = configs.findIndex(config => config.id === item.config.id);
+        if (index !== -1 && index < configs.length - 1) {
+            await testRunnerManager.moveConfig(item.config.id, index + 1);
+        }
+    });
+
+    const moveTestRunnerTo = vscode.commands.registerCommand('testRunner.moveTo', async (item: TestRunnerTreeItem) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+
+        const configs = testRunnerManager.getConfigs();
+        const picks: Array<vscode.QuickPickItem & { index: number }> = configs.map((config, idx) => ({
+            label: `${idx + 1}. ${config.title}`,
+            description: config.id === item.config.id ? 'Current position' : undefined,
+            index: idx
+        }));
+
+        const selection = (await vscode.window.showQuickPick(picks, {
+            placeHolder: 'Select the new position for this configuration'
+        })) as (typeof picks)[number] | undefined;
+
+        if (!selection) {
+            return;
+        }
+
+        await testRunnerManager.moveConfig(item.config.id, selection.index);
+    });
+
+    const hideTestRunnerConfiguration = vscode.commands.registerCommand('testRunner.hideConfiguration', async (item: TestRunnerTreeItem) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+
+        await testRunnerManager.setActivation(item.config.id, false);
+    });
+
+    const unhideTestRunnerConfiguration = vscode.commands.registerCommand(
+        'testRunner.unhideConfiguration',
+        async (item: TestRunnerTreeItem) => {
+            if (!item || !item.isConfig()) {
+                return;
+            }
+
+            await testRunnerManager.setActivation(item.config.id, true);
+        }
+    );
+
+    const runSingleTestCommand = vscode.commands.registerCommand(
+        'testRunner.runTest',
+        async (arg1: TestRunnerTreeItem | TestRunnerConfig, arg2?: DiscoveredTest) => {
+            let config: TestRunnerConfig | undefined;
+            let test: DiscoveredTest | undefined;
+
+            if (arg1 instanceof TestRunnerTreeItem) {
+                if (!arg1.isTest() || !arg1.test) {
+                    return;
+                }
+                config = arg1.config;
+                test = arg1.test;
+            } else {
+                config = arg1;
+                test = arg2;
+            }
+
+            if (!config || !test) {
+                return;
+            }
+
+            await testRunnerManager.runTest(config, test.label, {
+                file: test.file.fsPath,
+                line: String(test.line + 1)
+            });
+        }
+    );
+
+    const ignoreTestCommand = vscode.commands.registerCommand(
+        'testRunner.ignoreTest',
+        async (arg1: TestRunnerTreeItem | TestRunnerConfig, arg2?: DiscoveredTest) => {
+            let config: TestRunnerConfig | undefined;
+            let test: DiscoveredTest | undefined;
+
+            if (arg1 instanceof TestRunnerTreeItem) {
+                if (!arg1.isTest() || !arg1.test) {
+                    return;
+                }
+                config = arg1.config;
+                test = arg1.test;
+            } else {
+                config = arg1;
+                test = arg2;
+            }
+
+            if (!config || !test) {
+                return;
+            }
+
+            await testRunnerManager.addIgnoredTest(config.id, test.label);
+            vscode.window.showInformationMessage(`Ignored "${test.label}" in ${config.title}.`);
+        }
+    );
+
+    const gotoTestCommand = vscode.commands.registerCommand(
+        'testRunner.gotoTest',
+        async (arg1: TestRunnerTreeItem | TestRunnerConfig, arg2?: DiscoveredTest) => {
+            let test: DiscoveredTest | undefined;
+
+            if (arg1 instanceof TestRunnerTreeItem) {
+                if (!arg1.isTest() || !arg1.test) {
+                    return;
+                }
+                test = arg1.test;
+            } else {
+                test = arg2;
+            }
+
+            if (!test) {
+                return;
+            }
+
+            const document = await vscode.workspace.openTextDocument(test.file);
+            const editor = await vscode.window.showTextDocument(document);
+            const position = new vscode.Position(test.line, 0);
+            editor.selection = new vscode.Selection(position, position);
+            editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+        }
+    );
+
+    const expandAllTestRunners = vscode.commands.registerCommand('testRunner.expandAll', async () => {
+        await vscode.commands.executeCommand('workbench.actions.treeView.testRunnerTree.expandAll');
+    });
+
+    context.subscriptions.push(
+        openTestRunnerConfiguration,
+        runAllTestsCommand,
+        runConfigurationCommand,
+        moveTestRunnerUp,
+        moveTestRunnerDown,
+        moveTestRunnerTo,
+        hideTestRunnerConfiguration,
+        unhideTestRunnerConfiguration,
+        runSingleTestCommand,
+        ignoreTestCommand,
+        gotoTestCommand,
+        expandAllTestRunners
+    );
+
     // Documentation hub commands
     const openDocumentation = vscode.commands.registerCommand('documentationHub.openFile', async (uri: vscode.Uri) => {
         await documentationProvider.openFile(uri);
@@ -500,7 +709,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Show welcome message
-    vscode.window.showInformationMessage('Command Manager extension activated! Use Ctrl+Shift+C for quick access.');
+    vscode.window.showInformationMessage('Task and Documentation Hub extension activated! Use Ctrl+Shift+C for quick access.');
 }
 
 export function deactivate() {

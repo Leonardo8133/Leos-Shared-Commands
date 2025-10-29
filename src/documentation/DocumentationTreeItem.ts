@@ -20,7 +20,8 @@ export class DocumentationTreeItem extends vscode.TreeItem {
     public readonly labelText: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly metadata?: DocumentationFileMetadata,
-    public readonly children?: DocumentationTreeItem[]
+    public readonly children?: DocumentationTreeItem[],
+    public readonly folderPath?: string
   ) {
     super(labelText, collapsibleState);
 

@@ -10,10 +10,10 @@ export function getDefaultConfig(): CommandConfig {
           {
             id: 'hello-world',
             label: 'Echo Hello',
-            command: 'echo "Hello from Command Manager"',
+            command: 'echo "Hello from Task and Documentation Hub"',
             terminal: {
               type: 'vscode-new',
-              name: 'Command Manager'
+              name: 'Task and Documentation Hub'
             },
             description: 'Sample command that echoes a welcome message'
           },
@@ -37,6 +37,7 @@ export function getDefaultConfig(): CommandConfig {
         ]
       }
     ],
+    testRunners: [],
     sharedVariables: [
       {
         key: 'PROJECT_ROOT',
@@ -62,6 +63,10 @@ export function validateConfig(config: any): { valid: boolean; errors: string[] 
   if (!config || typeof config !== 'object') {
     errors.push('Config must be an object');
     return { valid: false, errors };
+  }
+
+  if (config.testRunners && !Array.isArray(config.testRunners)) {
+    errors.push('Config testRunners must be an array when provided');
   }
 
   if (!Array.isArray(config.folders)) {
@@ -123,6 +128,43 @@ export function validateConfig(config: any): { valid: boolean; errors: string[] 
           });
         }
       });
+    });
+  }
+
+  if (Array.isArray(config.testRunners)) {
+    config.testRunners.forEach((runner: any, index: number) => {
+      if (!runner || typeof runner !== 'object') {
+        errors.push(`Test runner ${index} must be an object`);
+        return;
+      }
+
+      if (typeof runner.id !== 'string' || runner.id.trim() === '') {
+        errors.push(`Test runner ${index} must have an id`);
+      }
+
+      if (typeof runner.title !== 'string' || runner.title.trim() === '') {
+        errors.push(`Test runner ${index} must have a title`);
+      }
+
+      if (typeof runner.activated !== 'boolean') {
+        errors.push(`Test runner ${index} must have an activated flag`);
+      }
+
+      if (!['javascript', 'typescript', 'python'].includes(runner.fileType)) {
+        errors.push(`Test runner ${index} must have a valid file type`);
+      }
+
+      if (typeof runner.fileNamePattern !== 'string') {
+        errors.push(`Test runner ${index} must have a file name pattern string`);
+      }
+
+      if (typeof runner.testNamePattern !== 'string') {
+        errors.push(`Test runner ${index} must have a test name pattern string`);
+      }
+
+      if (typeof runner.runTestCommand !== 'string' || runner.runTestCommand.trim() === '') {
+        errors.push(`Test runner ${index} must have a run test command`);
+      }
     });
   }
 

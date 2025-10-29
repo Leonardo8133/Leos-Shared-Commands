@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Runner Configuration</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background: var(--vscode-editor-background);
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 18px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px 16px;
+        margin-bottom: 16px;
+      }
+      label {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+        display: block;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 6px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--vscode-input-border);
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        font-size: 13px;
+      }
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+        font-family: var(--vscode-editor-font-family, monospace);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .row input[type='checkbox'] {
+        width: auto;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
+      button {
+        border: none;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .primary {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+      .primary:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+      .secondary {
+        background: transparent;
+        border: 1px solid var(--vscode-button-border, var(--vscode-button-background));
+        color: var(--vscode-button-foreground);
+      }
+      .danger {
+        background: var(--vscode-errorForeground);
+        color: var(--vscode-editor-background);
+      }
+      .help-text {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Test Runner Configuration</h1>
+    <div class="grid">
+      <div>
+        <label for="title">Title</label>
+        <input id="title" type="text" placeholder="Run unit tests" />
+      </div>
+      <div>
+        <label for="fileType">File type</label>
+        <select id="fileType">
+          <option value="javascript">Javascript</option>
+          <option value="typescript">Typescript</option>
+          <option value="python">Python</option>
+        </select>
+      </div>
+      <div>
+        <label for="workingDirectory">Working directory</label>
+        <input id="workingDirectory" type="text" placeholder="./" />
+        <div class="help-text">Optional path where tests should run.</div>
+      </div>
+      <div>
+        <label for="terminalName">Terminal name</label>
+        <input id="terminalName" type="text" placeholder="Test Runner" />
+      </div>
+      <div>
+        <label>Activated</label>
+        <div class="row">
+          <input id="activated" type="checkbox" />
+          <span>Enable this configuration</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid">
+      <div>
+        <label for="filePattern">File name pattern</label>
+        <textarea id="filePattern" placeholder="test_*&#10;*tests*"></textarea>
+        <div class="help-text">One pattern per line. Use * as wildcard.</div>
+      </div>
+      <div>
+        <label for="testPattern">Test name pattern</label>
+        <textarea id="testPattern" placeholder="test_*&#10;should_*"></textarea>
+        <div class="help-text">Filters individual tests. Leave blank to include all.</div>
+      </div>
+      <div>
+        <label for="ignoreList">Ignore list</label>
+        <textarea id="ignoreList" placeholder="test_to_skip"></textarea>
+        <div class="help-text">Tests added here will be ignored.</div>
+      </div>
+    </div>
+    <div>
+      <label for="command">Run test command</label>
+      <input id="command" type="text" placeholder="npm test -- $test" />
+      <div class="help-text">Use $test to reference the selected test name.</div>
+    </div>
+    <div class="actions">
+      <button id="runAll" type="button" class="secondary">Run all</button>
+      <button id="delete" type="button" class="danger">Delete</button>
+      <button id="save" type="button" class="primary">Save</button>
+    </div>
+    <script nonce="{{nonce}}">
+      const vscode = acquireVsCodeApi();
+      const state = {
+        id: null,
+        isExisting: false
+      };
+
+      const elements = {
+        title: document.getElementById('title'),
+        fileType: document.getElementById('fileType'),
+        workingDirectory: document.getElementById('workingDirectory'),
+        terminalName: document.getElementById('terminalName'),
+        activated: document.getElementById('activated'),
+        filePattern: document.getElementById('filePattern'),
+        testPattern: document.getElementById('testPattern'),
+        ignoreList: document.getElementById('ignoreList'),
+        command: document.getElementById('command'),
+        runAll: document.getElementById('runAll'),
+        deleteButton: document.getElementById('delete'),
+        save: document.getElementById('save')
+      };
+
+      function populate(config) {
+        state.id = config.id;
+        state.isExisting = !!config.isExisting;
+        elements.title.value = config.title || '';
+        elements.fileType.value = config.fileType || 'javascript';
+        elements.workingDirectory.value = config.workingDirectory || '';
+        elements.terminalName.value = config.terminalName || '';
+        elements.activated.checked = !!config.activated;
+        elements.filePattern.value = config.fileNamePattern || '';
+        elements.testPattern.value = config.testNamePattern || '';
+        elements.ignoreList.value = config.ignoreList || '';
+        elements.command.value = config.runTestCommand || '';
+        elements.deleteButton.disabled = !config.isExisting;
+      }
+
+      function collectConfig() {
+        return {
+          id: state.id,
+          title: elements.title.value,
+          fileType: elements.fileType.value,
+          workingDirectory: elements.workingDirectory.value,
+          terminalName: elements.terminalName.value,
+          activated: elements.activated.checked,
+          fileNamePattern: elements.filePattern.value,
+          testNamePattern: elements.testPattern.value,
+          ignoreList: elements.ignoreList.value,
+          runTestCommand: elements.command.value
+        };
+      }
+
+      window.addEventListener('message', event => {
+        const message = event.data;
+        if (message.type === 'load') {
+          populate({ ...message.config, isExisting: message.isExisting });
+        }
+      });
+
+      elements.save.addEventListener('click', () => {
+        vscode.postMessage({
+          type: 'saveTestRunner',
+          config: collectConfig()
+        });
+      });
+
+      elements.deleteButton.addEventListener('click', () => {
+        if (!state.isExisting) {
+          vscode.postMessage({ type: 'deleteTestRunner', id: state.id });
+          return;
+        }
+
+        const confirmed = confirm('Delete this test runner configuration?');
+        if (confirmed) {
+          vscode.postMessage({ type: 'deleteTestRunner', id: state.id });
+        }
+      });
+
+      elements.runAll.addEventListener('click', () => {
+        vscode.postMessage({ type: 'runAllTests', id: state.id });
+      });
+
+      vscode.postMessage({ type: 'ready' });
+    </script>
+  </body>
+</html>

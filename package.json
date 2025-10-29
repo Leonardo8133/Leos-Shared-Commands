@@ -1,7 +1,7 @@
 {
   "name": "command-manager",
-  "displayName": "Command Manager",
-  "description": "Manage and execute commands with variables, chains, and flexible terminal options",
+  "displayName": "Task and Documentation Hub",
+  "description": "Manage reusable commands, documentation, and automated test runners inside VS Code",
   "version": "1.0.0",
   "publisher": "LeonardoSouza",
   "author": {
@@ -42,7 +42,7 @@
       "activitybar": [
         {
           "id": "command-manager",
-          "title": "Command Manager",
+          "title": "Task and Documentation Hub",
           "icon": "resources/add-list.png"
         }
       ]
@@ -58,6 +58,11 @@
           "id": "documentationHubTree",
           "name": "Documentation Hub",
           "group": "2_documentation"
+        },
+        {
+          "id": "testRunnerTree",
+          "name": "Test Runner",
+          "group": "3_testRunner"
         }
       ]
     },
@@ -130,7 +135,7 @@
       },
       {
         "command": "commandManager.openConfiguration",
-        "title": "Configuration",
+        "title": "Task and Documentation Hub: Configuration",
         "icon": "$(gear)"
       },
       {
@@ -181,6 +186,78 @@
         "command": "documentationHub.unhideAll",
         "title": "Documentation Hub: Unhide All",
         "icon": "$(eye)"
+      },
+      {
+        "command": "testRunner.openConfiguration",
+        "title": "Test Runner: Open Configuration",
+        "icon": "$(gear)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.runAll",
+        "title": "Test Runner: Run All",
+        "icon": "$(run-all)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.runConfiguration",
+        "title": "Test Runner: Run Configuration",
+        "icon": "$(play-circle)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.expandAll",
+        "title": "Test Runner: Expand All",
+        "icon": "$(unfold-all)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.moveUp",
+        "title": "Test Runner: Move Up",
+        "icon": "$(arrow-up)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.moveDown",
+        "title": "Test Runner: Move Down",
+        "icon": "$(arrow-down)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.moveTo",
+        "title": "Test Runner: Move To",
+        "icon": "$(list-selection)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.hideConfiguration",
+        "title": "Test Runner: Hide Configuration",
+        "icon": "$(eye-closed)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.unhideConfiguration",
+        "title": "Test Runner: Unhide Configuration",
+        "icon": "$(eye)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.runTest",
+        "title": "Test Runner: Run Test",
+        "icon": "$(play-circle)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.ignoreTest",
+        "title": "Test Runner: Ignore Test",
+        "icon": "$(circle-slash)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.gotoTest",
+        "title": "Test Runner: Open Test",
+        "icon": "$(go-to-file)",
+        "category": "Task and Documentation Hub"
       }
     ],
     "menus": {
@@ -224,6 +301,21 @@
           "command": "documentationHub.unhideAll",
           "when": "view == documentationHubTree",
           "group": "navigation@4"
+        },
+        {
+          "command": "testRunner.runAll",
+          "when": "view == testRunnerTree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "testRunner.expandAll",
+          "when": "view == testRunnerTree",
+          "group": "navigation@2"
+        },
+        {
+          "command": "testRunner.openConfiguration",
+          "when": "view == testRunnerTree",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -316,11 +408,61 @@
           "command": "documentationHub.unhideItem",
           "when": "view == documentationHubTree && (viewItem == documentationFolder || viewItem == documentationReadme)",
           "group": "4_hide@2"
+        },
+        {
+          "command": "testRunner.openConfiguration",
+          "when": "view == testRunnerTree && (viewItem == testRunnerConfigActive || viewItem == testRunnerConfigInactive)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "testRunner.runConfiguration",
+          "when": "view == testRunnerTree && (viewItem == testRunnerConfigActive || viewItem == testRunnerConfigInactive)",
+          "group": "inline@1"
+        },
+        {
+          "command": "testRunner.moveUp",
+          "when": "view == testRunnerTree && (viewItem == testRunnerConfigActive || viewItem == testRunnerConfigInactive)",
+          "group": "2_modify@1"
+        },
+        {
+          "command": "testRunner.moveDown",
+          "when": "view == testRunnerTree && (viewItem == testRunnerConfigActive || viewItem == testRunnerConfigInactive)",
+          "group": "2_modify@2"
+        },
+        {
+          "command": "testRunner.moveTo",
+          "when": "view == testRunnerTree && (viewItem == testRunnerConfigActive || viewItem == testRunnerConfigInactive)",
+          "group": "2_modify@3"
+        },
+        {
+          "command": "testRunner.hideConfiguration",
+          "when": "view == testRunnerTree && viewItem == testRunnerConfigActive",
+          "group": "3_visibility@1"
+        },
+        {
+          "command": "testRunner.unhideConfiguration",
+          "when": "view == testRunnerTree && viewItem == testRunnerConfigInactive",
+          "group": "3_visibility@1"
+        },
+        {
+          "command": "testRunner.runTest",
+          "when": "view == testRunnerTree && viewItem == testRunnerTest",
+          "group": "inline@1"
+        },
+        {
+          "command": "testRunner.ignoreTest",
+          "when": "view == testRunnerTree && viewItem == testRunnerTest",
+          "group": "inline@2"
+        },
+        {
+          "command": "testRunner.gotoTest",
+          "when": "view == testRunnerTree && viewItem == testRunnerTest",
+          "group": "inline@3"
         }
       ]
     },
     "configuration": {
-      "title": "Command Manager",
+      "title": "Task and Documentation Hub",
       "properties": {
         "commandManager.documentationHub.viewMode": {
           "type": "string",
@@ -338,7 +480,7 @@
             "bottom"
           ],
           "default": "bottom",
-          "description": "Control whether the documentation hub appears above or below the command list in the Command Manager view container."
+          "description": "Control whether the documentation hub appears above or below the command list in the Task and Documentation Hub view container."
         }
       }
     }

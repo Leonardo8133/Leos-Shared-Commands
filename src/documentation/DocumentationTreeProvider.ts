@@ -22,13 +22,15 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
   private viewMode: ViewMode = 'tree';
   private watcher?: vscode.FileSystemWatcher;
   private hiddenItems: Set<string> = new Set();
+  private readonly storageKey = 'documentationHub.hiddenItems';
 
-  constructor(private readonly configManager: ConfigManager) {
+  constructor(private readonly configManager: ConfigManager, private readonly storage: vscode.Memento) {
     void this.initialize();
   }
 
   private async initialize(): Promise<void> {
     this.viewMode = this.getConfiguredViewMode();
+    this.hiddenItems = new Set(this.storage.get<string[]>(this.storageKey, []));
     await this.refreshMarkdownFiles();
     this.setupFileWatcher();
 
@@ -198,7 +200,14 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
 
       for (const folder of sortedFolders) {
         const children = [...buildItems(folder), ...folder.files.map(file => this.createFileItem(file))];
-        const item = new DocumentationTreeItem('folder', folder.name, vscode.TreeItemCollapsibleState.Collapsed, undefined, children);
+        const item = new DocumentationTreeItem(
+          'folder',
+          folder.name,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          undefined,
+          children,
+          folder.path
+        );
         item.iconPath = new vscode.ThemeIcon('folder');
         item.description = folder.path;
         
@@ -216,7 +225,7 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
     const visibleRootItems = rootItems.filter(item => !this.isHidden(item));
     
     if (!visibleRootItems.length) {
-      const emptyItem = new DocumentationTreeItem('search', 'No documentation found', vscode.TreeItemCollapsibleState.None);
+        const emptyItem = new DocumentationTreeItem('search', 'No documentation found', vscode.TreeItemCollapsibleState.None);
       emptyItem.iconPath = new vscode.ThemeIcon('book');
       emptyItem.command = undefined;
       return [emptyItem];
@@ -399,17 +408,20 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
   public hideItem(item: DocumentationTreeItem): void {
     const key = this.getItemKey(item);
     this.hiddenItems.add(key);
+    void this.persistHiddenItems();
     this.refresh();
   }
 
   public unhideItem(item: DocumentationTreeItem): void {
     const key = this.getItemKey(item);
     this.hiddenItems.delete(key);
+    void this.persistHiddenItems();
     this.refresh();
   }
 
   public unhideAll(): void {
     this.hiddenItems.clear();
+    void this.persistHiddenItems();
     this.refresh();
   }
 
@@ -422,9 +434,14 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
     if (item.type === 'file' && item.metadata) {
       return `file:${item.metadata.relativePath}`;
     } else if (item.type === 'folder') {
-      return `folder:${item.labelText}`;
+      const identifier = item.folderPath || item.labelText;
+      return `folder:${identifier}`;
     }
     return `search:${item.labelText}`;
+  }
+
+  private async persistHiddenItems(): Promise<void> {
+    await this.storage.update(this.storageKey, Array.from(this.hiddenItems));
   }
 
   public dispose(): void {

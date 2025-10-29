@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Command Manager extension will be documented in this file.
+All notable changes to the Task and Documentation Hub extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Drag-and-drop support for reorganising folders and commands directly inside the
-  Command Manager tree view.
+  Task and Documentation Hub command tree view.
 - Status bar enhancements with a hoverable command menu and support for pinning
   frequently used commands as dedicated status bar shortcuts.
+- Dedicated **Test Runner** side panel with configuration webview, inline test actions,
+  and automatic code lenses next to discovered tests.
 
 ### Changed
 - The default status bar shortcut now displays the full command hierarchy on
@@ -28,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved command execution reliability for external Command Prompt and
   PowerShell sessions.
 - Dedicated VS Code terminals no longer depend on optional terminal names to
-  persist between runs.
+  persist between runs and automatically generate unique names when collisions occur.
 
 ### Security
 - Nothing yet
@@ -101,8 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### User Interface
 - **Tree Views**
-  - Command Manager tree view in activity bar
-  - Documentation Hub tree view
+  - Commands, Documentation Hub, and Test Runner views inside the activity bar container
   - Collapsible folder structure
   - Context menus for all item types
 
@@ -221,7 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Release Notes
 
 ### Version 1.0.0
-This is the initial stable release of Command Manager. The extension provides a comprehensive solution for managing and executing commands in VS Code with advanced features like variable substitution, command chaining, and documentation integration.
+This is the initial stable release of Task and Documentation Hub (formerly Command Manager). The extension provides a comprehensive solution for managing and executing commands in VS Code with advanced features like variable substitution, command chaining, documentation integration, and a configurable test runner.
 
 **Key Highlights:**
 - Complete command management system
