@@ -44,7 +44,7 @@ class StatusBarManager {
         this.pinnedCommandIds = [];
         this.storageKey = 'commandManager.pinnedCommands';
         this.mainItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-        this.mainItem.text = '$(rocket) Commands';
+        this.mainItem.text = '$(rocket) Tasks';
         this.mainItem.tooltip = 'Task and Documentation Hub';
         this.mainItem.command = undefined;
         this.mainItem.show();
@@ -70,7 +70,10 @@ class StatusBarManager {
             void vscode.window.showInformationMessage(`Removed "${command.label}" from the status bar.`);
             return false;
         }
-        this.pinnedCommandIds.push(command.id);
+        if (!this.pinnedCommandIds.includes(command.id)) {
+            this.pinnedCommandIds.push(command.id);
+        }
+        this.pinnedCommandIds = Array.from(new Set(this.pinnedCommandIds));
         await this.context.globalState.update(this.storageKey, this.pinnedCommandIds);
         await this.rebuildPinnedItems();
         void vscode.window.showInformationMessage(`Pinned "${command.label}" to the status bar.`);

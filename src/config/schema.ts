@@ -1,4 +1,22 @@
-import { CommandConfig } from '../types';
+import { CommandConfig, TestRunnerConfig } from '../types';
+
+export function getDefaultTestRunnerConfig(): TestRunnerConfig {
+  return {
+    id: 'test-runner-default',
+    activated: true,
+    title: 'JavaScript Tests',
+    fileType: 'javascript',
+    workingDirectory: '',
+    fileNamePattern: 'test_*\n*test*\n*.spec.*',
+    testNamePattern: '*',
+    ignoreList: '',
+    runTestCommand: 'npm test -- $test_name',
+    terminalName: 'Test Runner',
+    allowNonTest: false,
+    autoFind: true,
+    inlineButton: true
+  };
+}
 
 export function getDefaultConfig(): CommandConfig {
   return {
@@ -37,7 +55,7 @@ export function getDefaultConfig(): CommandConfig {
         ]
       }
     ],
-    testRunners: [],
+    testRunners: [getDefaultTestRunnerConfig()],
     sharedVariables: [
       {
         key: 'PROJECT_ROOT',

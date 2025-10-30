@@ -80,25 +80,31 @@
       }
       .card {
         border: 1px solid var(--vscode-panel-border);
-        border-radius: 6px;
-        padding: 10px;
+        border-radius: 8px;
+        padding: 14px;
         display: flex;
         flex-direction: column;
         gap: 4px;
         background: var(--vscode-editor-background);
+        transition: border-color 0.08s ease, transform 0.08s ease, box-shadow 0.08s ease;
       }
       .card-title {
         font-weight: 600;
-        font-size: 13px;
+        font-size: 14px;
       }
       .card-description {
-        font-size: 12px;
+        font-size: 13px;
         color: var(--vscode-descriptionForeground);
       }
       .card-actions {
         margin-top: 8px;
         display: flex;
         gap: 8px;
+      }
+      .card:hover {
+        border-color: var(--vscode-textLink-foreground);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
       }
       button {
         border: none;

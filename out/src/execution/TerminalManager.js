@@ -1,15 +1,49 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TerminalManager = void 0;
-const vscode = require("vscode");
-const child_process = require("child_process");
+const vscode = __importStar(require("vscode"));
+const child_process = __importStar(require("child_process"));
+const path = __importStar(require("path"));
 class TerminalManager {
     constructor() {
         this.terminals = new Map();
         this.closeListener = vscode.window.onDidCloseTerminal(terminal => {
             const entriesToDelete = [];
-            for (const [name, tracked] of this.terminals.entries()) {
-                if (tracked === terminal) {
+            for (const [name, trackedTerminal] of this.terminals.entries()) {
+                if (trackedTerminal === terminal) {
                     entriesToDelete.push(name);
                 }
             }
@@ -46,9 +80,51 @@ class TerminalManager {
                 throw new Error(`Unknown terminal type: ${config.type}`);
         }
     }
+    // Run a command via child_process and resolve with its exit code
+    async executeCommandWithExitCode(command, config) {
+        // Use VS Code Tasks but ensure working directory is properly set
+        // Convert relative cwd to absolute if needed
+        let cwd = config.cwd;
+        if (cwd && !path.isAbsolute(cwd) && vscode.workspace.workspaceFolders?.[0]) {
+            cwd = path.resolve(vscode.workspace.workspaceFolders[0].uri.fsPath, cwd);
+        }
+        else if (!cwd && vscode.workspace.workspaceFolders?.[0]) {
+            cwd = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        }
+        const envEntries = Object.entries(process.env)
+            .filter((entry) => typeof entry[1] === 'string');
+        const safeEnv = Object.fromEntries(envEntries);
+        const shellOptions = {
+            cwd: cwd,
+            env: safeEnv
+        };
+        const shellExec = new vscode.ShellExecution(command, shellOptions);
+        const task = new vscode.Task({ type: 'shell' }, vscode.TaskScope.Workspace, config.name || 'Test Runner', 'Task and Documentation Hub', shellExec, []);
+        task.presentationOptions = {
+            reveal: vscode.TaskRevealKind.Always,
+            panel: vscode.TaskPanelKind.Dedicated
+        };
+        return await new Promise((resolve, reject) => {
+            let disposable;
+            disposable = vscode.tasks.onDidEndTaskProcess((e) => {
+                try {
+                    if (e.execution.task === task) {
+                        disposable?.dispose();
+                        resolve(typeof e.exitCode === 'number' ? e.exitCode : -1);
+                    }
+                }
+                catch (err) {
+                    disposable?.dispose();
+                    reject(err);
+                }
+            });
+            vscode.tasks.executeTask(task).then(undefined, reject);
+        });
+    }
     async executeInCurrentTerminal(command, config) {
         const activeTerminal = vscode.window.activeTerminal;
         if (!activeTerminal) {
+            // Create a new terminal if none exists
             const baseName = config.name || 'Task and Documentation Hub';
             const terminalInstance = this.createManagedTerminal(baseName);
             this.terminals.set(baseName, terminalInstance);
@@ -61,6 +137,7 @@ class TerminalManager {
     }
     async executeInNewTerminal(command, config) {
         const terminalName = config.name || 'Task and Documentation Hub';
+        // Try to reuse existing terminal with the same name
         let terminal = this.terminals.get(terminalName);
         if (terminal && this.isTerminalDisposed(terminal)) {
             this.terminals.delete(terminalName);
@@ -74,6 +151,7 @@ class TerminalManager {
         await this.executeInTerminal(terminal, command, config);
     }
     async executeInTerminal(terminal, command, config) {
+        // Change directory if specified
         if (config.cwd) {
             terminal.sendText(`cd "${config.cwd}"`);
         }
@@ -113,7 +191,7 @@ class TerminalManager {
         }
     }
     disposeAllTerminals() {
-        this.terminals.forEach(terminal => {
+        this.terminals.forEach((terminal, name) => {
             terminal.dispose();
         });
         this.terminals.clear();
@@ -148,3 +226,4 @@ class TerminalManager {
     }
 }
 exports.TerminalManager = TerminalManager;
+//# sourceMappingURL=TerminalManager.js.map

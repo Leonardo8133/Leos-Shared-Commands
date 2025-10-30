@@ -51,7 +51,7 @@
       "command-manager": [
         {
           "id": "commandManagerTree",
-          "name": "Commands",
+          "name": "Tasks",
           "group": "1_commands"
         },
         {
@@ -153,7 +153,7 @@
       },
       {
         "command": "documentationHub.extractCommands",
-        "title": "Documentation Hub: Extract Commands"
+        "title": "Documentation Hub: Extract Tasks"
       },
       {
         "command": "documentationHub.search",
@@ -188,6 +188,12 @@
         "icon": "$(eye)"
       },
       {
+        "command": "testRunner.newConfiguration",
+        "title": "Test Runner: New Configuration",
+        "icon": "$(add)",
+        "category": "Task and Documentation Hub"
+      },
+      {
         "command": "testRunner.openConfiguration",
         "title": "Test Runner: Open Configuration",
         "icon": "$(gear)",
@@ -206,9 +212,39 @@
         "category": "Task and Documentation Hub"
       },
       {
+        "command": "testRunner.runFolder",
+        "title": "Test Runner: Run All Tests in Folder",
+        "icon": "$(play-circle)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.runFile",
+        "title": "Test Runner: Run All Tests in File",
+        "icon": "$(play-circle)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.runTestCase",
+        "title": "Test Runner: Run All Tests in Test Case",
+        "icon": "$(play-circle)",
+        "category": "Task and Documentation Hub"
+      },
+      {
         "command": "testRunner.expandAll",
         "title": "Test Runner: Expand All",
-        "icon": "$(unfold-all)",
+        "icon": "$(expand-all)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.refresh",
+        "title": "Test Runner: Refresh",
+        "icon": "$(refresh)",
+        "category": "Task and Documentation Hub"
+      },
+      {
+        "command": "testRunner.findTests",
+        "title": "Find Tests",
+        "icon": "$(search)",
         "category": "Task and Documentation Hub"
       },
       {
@@ -230,14 +266,14 @@
         "category": "Task and Documentation Hub"
       },
       {
-        "command": "testRunner.hideConfiguration",
-        "title": "Test Runner: Hide Configuration",
+        "command": "testRunner.disableConfiguration",
+        "title": "Test Runner: Disable Configuration",
         "icon": "$(eye-closed)",
         "category": "Task and Documentation Hub"
       },
       {
-        "command": "testRunner.unhideConfiguration",
-        "title": "Test Runner: Unhide Configuration",
+        "command": "testRunner.enableConfiguration",
+        "title": "Test Runner: Enable Configuration",
         "icon": "$(eye)",
         "category": "Task and Documentation Hub"
       },
@@ -303,12 +339,12 @@
           "group": "navigation@4"
         },
         {
-          "command": "testRunner.runAll",
+          "command": "testRunner.newConfiguration",
           "when": "view == testRunnerTree",
           "group": "navigation@1"
         },
         {
-          "command": "testRunner.expandAll",
+          "command": "testRunner.runAll",
           "when": "view == testRunnerTree",
           "group": "navigation@2"
         },
@@ -316,6 +352,16 @@
           "command": "testRunner.openConfiguration",
           "when": "view == testRunnerTree",
           "group": "navigation@3"
+        },
+        {
+          "command": "testRunner.expandAll",
+          "when": "view == testRunnerTree",
+          "group": "navigation@4"
+        },
+        {
+          "command": "testRunner.refresh",
+          "when": "view == testRunnerTree",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -435,18 +481,28 @@
           "group": "2_modify@3"
         },
         {
-          "command": "testRunner.hideConfiguration",
+          "command": "testRunner.disableConfiguration",
           "when": "view == testRunnerTree && viewItem == testRunnerConfigActive",
           "group": "3_visibility@1"
         },
         {
-          "command": "testRunner.unhideConfiguration",
+          "command": "testRunner.enableConfiguration",
           "when": "view == testRunnerTree && viewItem == testRunnerConfigInactive",
           "group": "3_visibility@1"
         },
         {
+          "command": "testRunner.findTests",
+          "when": "view == testRunnerTree && (viewItem == testRunnerConfigActive || viewItem == testRunnerConfigInactive)",
+          "group": "2_modify@4"
+        },
+        {
           "command": "testRunner.runTest",
           "when": "view == testRunnerTree && viewItem == testRunnerTest",
+          "group": "inline@1"
+        },
+        {
+          "command": "testRunner.runTest",
+          "when": "view == testRunnerTree && viewItem == testRunnerTestWithButton",
           "group": "inline@1"
         },
         {
@@ -455,9 +511,34 @@
           "group": "inline@2"
         },
         {
+          "command": "testRunner.ignoreTest",
+          "when": "view == testRunnerTree && viewItem == testRunnerTestWithButton",
+          "group": "inline@2"
+        },
+        {
           "command": "testRunner.gotoTest",
           "when": "view == testRunnerTree && viewItem == testRunnerTest",
           "group": "inline@3"
+        },
+        {
+          "command": "testRunner.gotoTest",
+          "when": "view == testRunnerTree && viewItem == testRunnerTestWithButton",
+          "group": "inline@3"
+        },
+        {
+          "command": "testRunner.runFolder",
+          "when": "view == testRunnerTree && viewItem == testRunnerFolder",
+          "group": "inline@1"
+        },
+        {
+          "command": "testRunner.runFile",
+          "when": "view == testRunnerTree && viewItem == testRunnerFile",
+          "group": "inline@1"
+        },
+        {
+          "command": "testRunner.runTestCase",
+          "when": "view == testRunnerTree && viewItem == testRunnerTestCase",
+          "group": "inline@1"
         }
       ]
     },
@@ -488,7 +569,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "node scripts/compile.js",
-    "watch": "tsc -watch -p ./",
+    "watch": "npm run compile && tsc -watch -p ./",
     "watch:all": "concurrently \"tsc -watch -p ./\" \"npm run watch:html\"",
     "watch:html": "node -e \"const fs=require('fs');const path=require('path');const {exec}=require('child_process');const watchDir='resources';let timeout;function compile(){clearTimeout(timeout);timeout=setTimeout(()=>exec('npm run compile',(e,o,er)=>console.log('HTML changed, compiling...')),100);}fs.watch(watchDir,{recursive:true},(e,f)=>f.endsWith('.html')&&compile());console.log('Watching HTML files in',watchDir);\"",
     "pretest": "npm run compile",
@@ -496,6 +577,7 @@
     "test:watch": "npm run watch && npm run test",
     "test:playwright": "npm run compile && npx playwright test",
     "test:ui": "npx wdio run wdio.conf.js",
+    "test:ui:single": "npx wdio run wdio.conf.js --spec",
     "test:all": "npm test && npm run test:playwright && npm run test:ui",
     "test:vet": "vscode-extension-tester --config ./et-tests/mocha-vscode.json"
   },
@@ -516,8 +598,8 @@
     "mocha": "^10.0.0",
     "playwright": "^1.56.1",
     "typescript": "^5.3.0",
+    "vscode-extension-tester": "^6.0.0",
     "wdio-vscode-service": "^6.1.4",
-    "webdriverio": "^8.46.0",
-    "vscode-extension-tester": "^6.0.0"
+    "webdriverio": "^8.46.0"
   }
 }

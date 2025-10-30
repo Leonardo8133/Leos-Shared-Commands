@@ -488,7 +488,7 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
       }
 
       if (destinationPath.length === 0) {
-        void vscode.window.showWarningMessage('Commands must be placed inside a folder.');
+        void vscode.window.showWarningMessage('Tasks must be placed inside a folder.');
         return;
       }
 

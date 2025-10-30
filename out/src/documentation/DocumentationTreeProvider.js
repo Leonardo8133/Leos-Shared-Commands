@@ -52,8 +52,7 @@ class DocumentationTreeProvider {
     }
     async initialize() {
         this.viewMode = this.getConfiguredViewMode();
-        const storedHidden = this.storage.get(this.storageKey, []);
-        this.hiddenItems = new Set(storedHidden);
+        this.hiddenItems = new Set(this.storage.get(this.storageKey, []));
         await this.refreshMarkdownFiles();
         this.setupFileWatcher();
         vscode.workspace.onDidChangeConfiguration(event => {
@@ -297,7 +296,7 @@ class DocumentationTreeProvider {
             const folderName = this.generateFolderName(uri, config.folders.map(folder => folder.name));
             config.folders.push({
                 name: folderName,
-                description: `Commands extracted from ${path.basename(uri.fsPath)}`,
+                description: `Tasks extracted from ${path.basename(uri.fsPath)}`,
                 commands: commands.map((command, index) => this.createCommandFromSnippet(command, folderName, index))
             });
             await this.configManager.saveConfig(config);
@@ -330,11 +329,11 @@ class DocumentationTreeProvider {
     }
     generateFolderName(uri, existingNames) {
         const base = path.basename(uri.fsPath, path.extname(uri.fsPath));
-        let name = `${this.toTitleCase(base)} Commands`;
+        let name = `${this.toTitleCase(base)} Tasks`;
         let counter = 1;
         while (existingNames.includes(name)) {
             counter += 1;
-            name = `${this.toTitleCase(base)} Commands ${counter}`;
+            name = `${this.toTitleCase(base)} Tasks ${counter}`;
         }
         return name;
     }

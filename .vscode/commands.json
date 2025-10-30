@@ -32,6 +32,16 @@
             }
           ],
           "description": "Builds the project using one of the configured environments"
+        },
+        {
+          "id": "compile",
+          "label": "Compile",
+          "command": "npm run compile",
+          "terminal": {
+            "type": "vscode-new",
+            "name": "compile"
+          },
+          "variables": []
         }
       ]
     }
@@ -56,6 +66,6 @@
       "description": "Common deployment targets"
     }
   ],
-  "version": 1,
-  "lastModified": "2025-10-22T17:49:09.517Z"
+  "version": 2,
+  "lastModified": "2025-10-30T00:56:48.572Z"
 }

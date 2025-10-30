@@ -1,6 +1,25 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateConfig = exports.getDefaultConfig = void 0;
+exports.getDefaultTestRunnerConfig = getDefaultTestRunnerConfig;
+exports.getDefaultConfig = getDefaultConfig;
+exports.validateConfig = validateConfig;
+function getDefaultTestRunnerConfig() {
+    return {
+        id: 'test-runner-default',
+        activated: true,
+        title: 'JavaScript Tests',
+        fileType: 'javascript',
+        workingDirectory: '',
+        fileNamePattern: 'test_*\n*test*\n*.spec.*',
+        testNamePattern: '*',
+        ignoreList: '',
+        runTestCommand: 'npm test -- $test_name',
+        terminalName: 'Test Runner',
+        allowNonTest: false,
+        autoFind: true,
+        inlineButton: true
+    };
+}
 function getDefaultConfig() {
     return {
         folders: [
@@ -38,7 +57,7 @@ function getDefaultConfig() {
                 ]
             }
         ],
-        testRunners: [],
+        testRunners: [getDefaultTestRunnerConfig()],
         sharedVariables: [
             {
                 key: 'PROJECT_ROOT',
@@ -57,7 +76,6 @@ function getDefaultConfig() {
         ]
     };
 }
-exports.getDefaultConfig = getDefaultConfig;
 function validateConfig(config) {
     const errors = [];
     if (!config || typeof config !== 'object') {
@@ -148,5 +166,4 @@ function validateConfig(config) {
     }
     return { valid: errors.length === 0, errors };
 }
-exports.validateConfig = validateConfig;
 //# sourceMappingURL=schema.js.map

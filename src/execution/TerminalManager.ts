@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as child_process from 'child_process';
+import * as path from 'path';
 import { TerminalConfig } from '../types';
 
 export class TerminalManager {
@@ -52,6 +53,57 @@ export class TerminalManager {
       default:
         throw new Error(`Unknown terminal type: ${config.type}`);
     }
+  }
+
+  // Run a command via child_process and resolve with its exit code
+  public async executeCommandWithExitCode(command: string, config: TerminalConfig): Promise<number> {
+    // Use VS Code Tasks but ensure working directory is properly set
+    // Convert relative cwd to absolute if needed
+    let cwd = config.cwd;
+    if (cwd && !path.isAbsolute(cwd) && vscode.workspace.workspaceFolders?.[0]) {
+      cwd = path.resolve(vscode.workspace.workspaceFolders[0].uri.fsPath, cwd);
+    } else if (!cwd && vscode.workspace.workspaceFolders?.[0]) {
+      cwd = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    }
+
+    const envEntries = Object.entries(process.env as Record<string, string | undefined>)
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string');
+    const safeEnv = Object.fromEntries(envEntries) as Record<string, string>;
+    const shellOptions: vscode.ShellExecutionOptions = {
+      cwd: cwd,
+      env: safeEnv
+    };
+    const shellExec = new vscode.ShellExecution(command, shellOptions);
+
+    const task = new vscode.Task(
+      { type: 'shell' },
+      vscode.TaskScope.Workspace,
+      config.name || 'Test Runner',
+      'Task and Documentation Hub',
+      shellExec,
+      []
+    );
+    task.presentationOptions = {
+      reveal: vscode.TaskRevealKind.Always,
+      panel: vscode.TaskPanelKind.Dedicated
+    };
+
+    return await new Promise<number>((resolve, reject) => {
+      let disposable: vscode.Disposable | undefined;
+      disposable = vscode.tasks.onDidEndTaskProcess((e) => {
+        try {
+          if (e.execution.task === task) {
+            disposable?.dispose();
+            resolve(typeof e.exitCode === 'number' ? e.exitCode : -1);
+          }
+        } catch (err) {
+          disposable?.dispose();
+          reject(err);
+        }
+      });
+
+      vscode.tasks.executeTask(task).then(undefined, reject);
+    });
   }
 
   private async executeInCurrentTerminal(command: string, config: TerminalConfig): Promise<void> {

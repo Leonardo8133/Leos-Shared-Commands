@@ -51,6 +51,9 @@ export interface TestRunnerConfig {
   ignoreList?: string;
   runTestCommand: string;
   terminalName?: string;
+  allowNonTest?: boolean; // Default: true
+  autoFind?: boolean; // Default: true
+  inlineButton?: boolean; // Default: true
 }
 
 

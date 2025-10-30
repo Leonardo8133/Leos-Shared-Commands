@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VariableResolver = void 0;
 const vscode = __importStar(require("vscode"));
+const path = __importStar(require("path"));
 const ConfigManager_1 = require("../config/ConfigManager");
 const errors_1 = require("./errors");
 class VariableResolver {
@@ -168,8 +169,41 @@ class VariableResolver {
                 resolved.push({ key, value: finalValue });
                 continue;
             }
+            if (type === 'file') {
+                const basePath = variableDefinition?.value?.trim() || '';
+                const defaultUri = this.resolveBaseDirectoryUri(basePath);
+                const selection = await vscode.window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectFolders: false,
+                    canSelectMany: false,
+                    openLabel: variableDefinition?.label ? `Select ${variableDefinition.label}` : 'Select file',
+                    defaultUri
+                });
+                if (!selection || selection.length === 0) {
+                    throw new errors_1.UserCancelledError();
+                }
+                resolved.push({ key, value: selection[0].fsPath });
+                continue;
+            }
         }
         return resolved;
+    }
+    resolveBaseDirectoryUri(inputPath) {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!inputPath) {
+            return workspaceFolder?.uri;
+        }
+        const trimmed = inputPath.replace('${workspaceFolder}', workspaceFolder?.uri.fsPath ?? '');
+        const normalized = trimmed.trim();
+        if (!normalized) {
+            return workspaceFolder?.uri;
+        }
+        const absolutePath = path.isAbsolute(normalized)
+            ? normalized
+            : workspaceFolder
+                ? path.join(workspaceFolder.uri.fsPath, normalized)
+                : normalized;
+        return vscode.Uri.file(absolutePath);
     }
     dispose() {
         // No-op for compatibility with previous implementation

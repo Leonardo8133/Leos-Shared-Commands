@@ -43,24 +43,30 @@ export class TestRunnerCodeLensProvider implements vscode.CodeLensProvider {
   }
 
   private createLensesForTest(config: TestRunnerConfig, test: DiscoveredTest): vscode.CodeLens[] {
-    const runTitle = `$(play-circle) Run (${config.title})`;
+    const lenses: vscode.CodeLens[] = [];
+    
+    // Only show inline button if enabled (default: true)
+    if (config.inlineButton !== false) {
+      const runTitle = `$(play-circle) Run Test with "${config.title}"`;
+      const runLens = new vscode.CodeLens(test.range, {
+        title: runTitle,
+        tooltip: `Run ${test.label} with configuration "${config.title}"`,
+        command: 'testRunner.runTest',
+        arguments: [config, test]
+      });
+      lenses.push(runLens);
+    }
+
     const ignoreTitle = '$(eye-closed) Ignore';
-
-    const runLens = new vscode.CodeLens(test.range, {
-      title: runTitle,
-      tooltip: `Run ${test.label} using ${config.title}`,
-      command: 'testRunner.runTest',
-      arguments: [config, test]
-    });
-
     const ignoreLens = new vscode.CodeLens(test.range, {
       title: ignoreTitle,
       tooltip: `Ignore ${test.label} in ${config.title}`,
       command: 'testRunner.ignoreTest',
       arguments: [config, test]
     });
+    lenses.push(ignoreLens);
 
-    return [runLens, ignoreLens];
+    return lenses;
   }
 
   private shouldProcessDocument(document: vscode.TextDocument): boolean {

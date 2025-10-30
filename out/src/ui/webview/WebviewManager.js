@@ -42,14 +42,9 @@ const VariableResolver_1 = require("../../variables/VariableResolver");
 const TestRunnerManager_1 = require("../../testRunner/TestRunnerManager");
 class WebviewManager {
     constructor() {
-        this.commandPanel = undefined;
-        this.folderPanel = undefined;
-        this.configPanel = undefined;
-        this.testRunnerPanel = undefined;
         this.configManager = ConfigManager_1.ConfigManager.getInstance();
         this.variableResolver = VariableResolver_1.VariableResolver.getInstance();
         this.testRunnerManager = TestRunnerManager_1.TestRunnerManager.getInstance();
-        this.treeProvider = undefined;
     }
     static getInstance() {
         if (!WebviewManager.instance) {
@@ -179,7 +174,7 @@ class WebviewManager {
     }
     showTestRunnerEditor(testRunnerId) {
         const existing = testRunnerId ? this.testRunnerManager.getConfigById(testRunnerId) : undefined;
-        const initialConfig = existing ? { ...existing } : this.createDefaultTestRunner();
+        const initialConfig = existing ? { ...existing } : this.createEmptyTestRunner();
         if (this.testRunnerPanel) {
             this.testRunnerPanel.reveal();
             this.testRunnerPanel.title = existing ? `Edit ${existing.title}` : 'New Test Runner';
@@ -189,32 +184,118 @@ class WebviewManager {
         this.testRunnerPanel = vscode.window.createWebviewPanel('testRunnerEditor', existing ? `Edit ${existing.title}` : 'New Test Runner', vscode.ViewColumn.One, {
             enableScripts: true,
             retainContextWhenHidden: true,
-            localResourceRoots: [this.getWebviewRoot()]
+            localResourceRoots: [this.getWebviewRoot(), this.getResourceRoot()]
         });
         this.testRunnerPanel.webview.html = this.getHtmlContent('test-runner-editor.html', this.testRunnerPanel.webview);
         this.testRunnerPanel.webview.onDidReceiveMessage(async (message) => {
             switch (message.type) {
                 case 'ready':
-                    this.sendTestRunnerState(initialConfig, existing !== undefined);
+                    // Load tests for existing configurations
+                    if (existing && existing.activated) {
+                        this.testRunnerManager.discoverTests(existing).then(tests => {
+                            const testsForDisplay = tests.map(test => ({
+                                label: test.label,
+                                file: test.file.fsPath,
+                                filePath: path.relative(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', test.file.fsPath),
+                                line: test.line
+                            }));
+                            this.sendTestRunnerState(initialConfig, existing !== undefined, testsForDisplay);
+                        }).catch(() => {
+                            this.sendTestRunnerState(initialConfig, existing !== undefined);
+                        });
+                    }
+                    else {
+                        this.sendTestRunnerState(initialConfig, existing !== undefined);
+                    }
+                    break;
+                case 'runSingleTest':
+                    try {
+                        const currentId = typeof message.id === 'string' ? message.id : initialConfig.id;
+                        const runner = this.testRunnerManager.getConfigById(currentId);
+                        if (runner && typeof message.label === 'string') {
+                            const passed = await this.testRunnerManager.runTestWithResult(runner, message.label);
+                            this.testRunnerPanel?.webview.postMessage({ type: 'testRunResult', label: message.label, status: passed ? 'passed' : 'failed' });
+                        }
+                    }
+                    catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : String(error);
+                        vscode.window.showErrorMessage(`Test execution failed: ${errorMessage}`);
+                        this.testRunnerPanel?.webview.postMessage({ type: 'testRunResult', label: message?.label, status: 'failed' });
+                    }
                     break;
                 case 'saveTestRunner':
                     try {
                         const sanitized = this.sanitizeTestRunnerInput(message.config);
+                        console.log('[WebviewManager] ========== SAVE TEST RUNNER START ==========');
+                        console.log('[WebviewManager] Saving test runner config:', JSON.stringify(sanitized, null, 2));
                         await this.testRunnerManager.saveConfig(sanitized);
-                        this.sendTestRunnerState(sanitized, true);
-                        vscode.window.showInformationMessage(`Saved test runner "${sanitized.title}".`);
+                        console.log('[WebviewManager] Config saved successfully');
+                        console.log('[WebviewManager] Starting test discovery...');
+                        // Discover tests after saving
+                        let tests = [];
+                        try {
+                            console.log('[WebviewManager] Calling discoverTests...');
+                            tests = await this.testRunnerManager.discoverTests(sanitized);
+                            console.log('[WebviewManager] Test discovery completed:', {
+                                count: tests.length,
+                                tests: tests.map(t => ({ label: t.label, file: t.file.fsPath }))
+                            });
+                        }
+                        catch (discoverError) {
+                            console.error('[WebviewManager] ERROR during test discovery:', discoverError);
+                            console.error('[WebviewManager] Error stack:', discoverError instanceof Error ? discoverError.stack : 'No stack');
+                            vscode.window.showErrorMessage(`Test discovery failed: ${discoverError instanceof Error ? discoverError.message : String(discoverError)}`);
+                        }
+                        const testsForDisplay = tests.map(test => ({
+                            label: test.label,
+                            file: test.file.fsPath,
+                            filePath: path.relative(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', test.file.fsPath),
+                            line: test.line
+                        }));
+                        console.log('[WebviewManager] Sending test results to webview:', { count: testsForDisplay.length });
+                        this.sendTestRunnerState(sanitized, true, testsForDisplay);
+                        console.log('[WebviewManager] ========== SAVE TEST RUNNER END ==========');
+                        vscode.window.showInformationMessage(`Saved test runner "${sanitized.title}". Found ${tests.length} test(s).`);
                     }
                     catch (error) {
                         const messageText = error instanceof Error ? error.message : String(error);
+                        console.error('[WebviewManager] ERROR saving test runner:', error);
+                        console.error('[WebviewManager] Error stack:', error instanceof Error ? error.stack : 'No stack');
                         vscode.window.showErrorMessage(`Failed to save test runner: ${messageText}`);
                     }
                     break;
                 case 'deleteTestRunner':
                     try {
-                        const identifier = typeof message.id === 'string' ? message.id : initialConfig.id;
+                        const identifier = typeof message.id === 'string' && message.id ? message.id : initialConfig.id;
+                        if (!identifier) {
+                            vscode.window.showWarningMessage('Cannot delete: No test runner ID provided.');
+                            break;
+                        }
                         await this.testRunnerManager.deleteConfig(identifier);
                         vscode.window.showInformationMessage('Test runner deleted.');
                         this.testRunnerPanel?.dispose();
+                    }
+                    catch (error) {
+                        const messageText = error instanceof Error ? error.message : String(error);
+                        vscode.window.showErrorMessage(`Failed to delete test runner: ${messageText}`);
+                    }
+                    break;
+                case 'requestDeleteTestRunner':
+                    try {
+                        const identifier = typeof message.id === 'string' && message.id ? message.id : initialConfig.id;
+                        if (!identifier) {
+                            vscode.window.showWarningMessage('Cannot delete: No test runner ID provided.');
+                            break;
+                        }
+                        // Show VS Code confirmation dialog
+                        const config = this.testRunnerManager.getConfigById(identifier);
+                        const configTitle = config?.title || 'this test runner';
+                        const confirmed = await vscode.window.showWarningMessage(`Are you sure you want to delete "${configTitle}"?`, { modal: true }, 'Delete');
+                        if (confirmed === 'Delete') {
+                            await this.testRunnerManager.deleteConfig(identifier);
+                            vscode.window.showInformationMessage('Test runner deleted.');
+                            this.testRunnerPanel?.dispose();
+                        }
                     }
                     catch (error) {
                         const messageText = error instanceof Error ? error.message : String(error);
@@ -246,22 +327,57 @@ class WebviewManager {
                         }
                     }
                     break;
+                case 'showError':
+                    if (typeof message.message === 'string') {
+                        vscode.window.showErrorMessage(message.message);
+                    }
+                    break;
+                case 'showInfo':
+                    if (typeof message.message === 'string') {
+                        vscode.window.showInformationMessage(message.message);
+                    }
+                    break;
+                case 'cancel':
+                    this.testRunnerPanel?.dispose();
+                    break;
             }
         });
         this.testRunnerPanel.onDidDispose(() => {
             this.testRunnerPanel = undefined;
         });
     }
-    sendTestRunnerState(config, isExisting) {
+    sendTestRunnerState(config, isExisting, tests) {
         if (!this.testRunnerPanel) {
             return;
         }
         this.testRunnerPanel.title = isExisting ? `Edit ${config.title}` : 'New Test Runner';
+        const passIcon = this.testRunnerPanel.webview.asWebviewUri(vscode.Uri.file(path.join(this.getResourceRoot().fsPath, '..', 'yes_9426997.png')));
+        const failIcon = this.testRunnerPanel.webview.asWebviewUri(vscode.Uri.file(path.join(this.getResourceRoot().fsPath, '..', 'remove_16597122.png')));
         this.testRunnerPanel.webview.postMessage({
             type: 'load',
             config,
-            isExisting
+            isExisting,
+            tests: tests || [],
+            iconUris: { pass: passIcon.toString(), fail: failIcon.toString() }
         });
+    }
+    createEmptyTestRunner() {
+        const timestamp = Date.now();
+        return {
+            id: `test-runner-${timestamp}`,
+            activated: true,
+            title: '',
+            fileType: 'javascript',
+            workingDirectory: '',
+            fileNamePattern: '',
+            testNamePattern: '*',
+            ignoreList: '',
+            runTestCommand: '',
+            terminalName: '',
+            allowNonTest: false,
+            autoFind: true,
+            inlineButton: true
+        };
     }
     createDefaultTestRunner() {
         const timestamp = Date.now();
@@ -274,23 +390,28 @@ class WebviewManager {
             fileNamePattern: 'test_*',
             testNamePattern: '*',
             ignoreList: '',
-            runTestCommand: 'npm test -- $test',
+            runTestCommand: 'npm test -- $test_name',
             terminalName: 'Test Runner'
         };
     }
     sanitizeTestRunnerInput(data) {
-        const baseId = typeof (data === null || data === void 0 ? void 0 : data.id) === 'string' && data.id.trim() ? data.id.trim() : this.createDefaultTestRunner().id;
-        const title = typeof (data === null || data === void 0 ? void 0 : data.title) === 'string' && data.title.trim() ? data.title.trim() : 'Untitled Test Runner';
-        const fileType = ['javascript', 'typescript', 'python'].includes(data?.fileType) ? data.fileType : 'javascript';
-        const fileNamePattern = typeof (data === null || data === void 0 ? void 0 : data.fileNamePattern) === 'string' ? data.fileNamePattern : '';
-        const testNamePattern = typeof (data === null || data === void 0 ? void 0 : data.testNamePattern) === 'string' ? data.testNamePattern : '';
-        const ignoreList = typeof (data === null || data === void 0 ? void 0 : data.ignoreList) === 'string' ? data.ignoreList : '';
-        const workingDirectory = typeof (data === null || data === void 0 ? void 0 : data.workingDirectory) === 'string' ? data.workingDirectory.trim() : '';
-        const runTestCommand = typeof (data === null || data === void 0 ? void 0 : data.runTestCommand) === 'string' ? data.runTestCommand.trim() : '';
-        const terminalName = typeof (data === null || data === void 0 ? void 0 : data.terminalName) === 'string' ? data.terminalName.trim() : '';
-        const activated = typeof (data === null || data === void 0 ? void 0 : data.activated) === 'boolean' ? data.activated : Boolean(data?.activated);
+        const baseId = typeof data?.id === 'string' && data.id.trim() ? data.id.trim() : this.createDefaultTestRunner().id;
+        const title = typeof data?.title === 'string' && data.title.trim() ? data.title.trim() : 'Untitled Test Runner';
+        const fileType = ['javascript', 'typescript', 'python'].includes(data?.fileType)
+            ? data.fileType
+            : 'javascript';
+        const fileNamePattern = typeof data?.fileNamePattern === 'string' ? data.fileNamePattern : '';
+        const testNamePattern = typeof data?.testNamePattern === 'string' ? data.testNamePattern : '';
+        const ignoreList = typeof data?.ignoreList === 'string' ? data.ignoreList : '';
+        const workingDirectory = typeof data?.workingDirectory === 'string' ? data.workingDirectory.trim() : '';
+        const runTestCommand = typeof data?.runTestCommand === 'string' ? data.runTestCommand.trim() : '';
+        const terminalName = typeof data?.terminalName === 'string' ? data.terminalName.trim() : '';
+        const activated = typeof data?.activated === 'boolean' ? data.activated : Boolean(data?.activated);
+        const allowNonTest = typeof data?.allowNonTest === 'boolean' ? data.allowNonTest : false;
+        const autoFind = typeof data?.autoFind === 'boolean' ? data.autoFind : true;
+        const inlineButton = typeof data?.inlineButton === 'boolean' ? data.inlineButton : true;
         if (!runTestCommand) {
-            throw new Error('Run test command is required. Use $test to reference the current test name.');
+            throw new Error('Run test command is required. Use $test_name, $test_path, or other available variables.');
         }
         return {
             id: baseId,
@@ -302,7 +423,10 @@ class WebviewManager {
             testNamePattern,
             ignoreList,
             runTestCommand,
-            terminalName: terminalName || title
+            terminalName: terminalName || title,
+            allowNonTest,
+            autoFind,
+            inlineButton
         };
     }
     dispose() {
@@ -314,6 +438,9 @@ class WebviewManager {
     }
     getWebviewRoot() {
         return vscode.Uri.file(path.join(__dirname, '..', '..', '..', 'resources', 'webviews'));
+    }
+    getResourceRoot() {
+        return vscode.Uri.file(path.join(__dirname, '..', '..', '..', 'resources'));
     }
     getHtmlContent(template, webview, replacements = {}) {
         const templatePath = path.join(this.getWebviewRoot().fsPath, template);

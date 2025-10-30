@@ -15,7 +15,7 @@ export class StatusBarManager implements vscode.Disposable {
     private readonly configManager: ConfigManager
   ) {
     this.mainItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    this.mainItem.text = '$(rocket) Commands';
+    this.mainItem.text = '$(rocket) Tasks';
     this.mainItem.tooltip = 'Task and Documentation Hub';
     this.mainItem.command = undefined;
     this.mainItem.show();

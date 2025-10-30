@@ -222,22 +222,27 @@
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
         display: none;
         z-index: 1000;
+        padding: 6px;
       }
       .icon-dropdown button {
         display: flex;
         align-items: center;
         gap: 8px;
         width: 100%;
-        padding: 6px 10px;
+        padding: 10px 12px;
         border: none;
         background: transparent;
         color: inherit;
         cursor: pointer;
         text-align: left;
-        font-size: 12px;
+        font-size: 13px;
+        border-radius: 6px;
+        margin: 4px 0;
+        transition: background-color 0.08s ease, transform 0.08s ease;
       }
       .icon-dropdown button:hover {
         background: var(--vscode-list-hoverBackground);
+        transform: translateY(-1px);
       }
       .checkbox-row {
         display: flex;
@@ -269,19 +274,25 @@
         display: none;
         z-index: 9999;
         pointer-events: auto;
+        padding: 6px;
       }
       .variable-dropdown button {
         display: flex;
         width: 100%;
-        padding: 6px 10px;
+        padding: 10px 12px;
         border: none;
         background: transparent;
         color: inherit;
         cursor: pointer;
         text-align: left;
+        border-radius: 6px;
+        margin: 4px 0;
+        font-size: 13px;
+        transition: background-color 0.08s ease, transform 0.08s ease;
       }
       .variable-dropdown button:hover {
         background: var(--vscode-list-hoverBackground);
+        transform: translateY(-1px);
       }
       .variable-dropdown .type {
         font-size: 11px;
@@ -585,29 +596,48 @@
         });
       }
 
+      function createValueField(type, value) {
+        if (type === 'options') {
+          return {
+            input: `<textarea class="variable-value" placeholder="production&#10;development&#10;staging" rows="3">${value || ''}</textarea>`,
+            help: '<div class="variable-help">Add one option per line</div>'
+          };
+        }
+
+        if (type === 'file') {
+          return {
+            input: `<input type="text" class="variable-value" placeholder="./relative/path" value="${value || ''}" />`,
+            help: '<div class="variable-help">Optional base directory. Relative paths use the workspace root.</div>'
+          };
+        }
+
+        return {
+          input: `<input type="text" class="variable-value" placeholder="production" value="${value || ''}" />`,
+          help: ''
+        };
+      }
+
       function addVariableRow(variable = { value: '', label: '', type: 'fixed' }) {
         const row = document.createElement('div');
         row.className = 'variables-table variable-row';
-        
-        // Create the value field based on type
-        const valueField = variable.type === 'options' 
-          ? `<textarea class="variable-value" placeholder="production&#10;development&#10;staging" rows="3">${variable.value || ''}</textarea>`
-          : `<input type="text" class="variable-value" placeholder="production" value="${variable.value || ''}" />`;
-        
+
+        const { input: initialValueField, help: initialHelp } = createValueField(variable.type, variable.value || '');
+
         // Generate key for display
         const baseKey = slugify(variable.label);
         const key = variable.key || generateUniqueKey(baseKey);
-        
+
         row.innerHTML = `
           <select class="variable-type">
             <option value="fixed" ${variable.type === 'fixed' ? 'selected' : ''}>Fixed</option>
             <option value="options" ${variable.type === 'options' ? 'selected' : ''}>Options</option>
+            <option value="file" ${variable.type === 'file' ? 'selected' : ''}>File Picker</option>
           </select>
           <input type="text" class="variable-label" placeholder="Environment" value="${variable.label || ''}" />
           <div class="variable-key-display" title="Click to copy key">${key}</div>
           <div class="variable-value-container">
-            ${valueField}
-            ${variable.type === 'options' ? '<div class="variable-help">Add one option per line</div>' : ''}
+            ${initialValueField}
+            ${initialHelp}
           </div>
           <button type="button" class="remove" title="Remove variable">×</button>
         `;
@@ -621,16 +651,14 @@
         // Handle type change to switch between input and textarea
         const typeSelect = row.querySelector('.variable-type');
         const valueContainer = row.querySelector('.variable-value-container');
-        const currentValue = row.querySelector('.variable-value').value;
-        
+
         typeSelect.addEventListener('change', () => {
-          const isOptions = typeSelect.value === 'options';
-          const newValueField = isOptions 
-            ? `<textarea class="variable-value" placeholder="production&#10;development&#10;staging" rows="3">${currentValue}</textarea>`
-            : `<input type="text" class="variable-value" placeholder="production" value="${currentValue}" />`;
-          
-          valueContainer.innerHTML = newValueField + (isOptions ? '<div class="variable-help">Add one option per line</div>' : '');
-          
+          const currentValue = valueContainer.querySelector('.variable-value')
+            ? valueContainer.querySelector('.variable-value').value
+            : '';
+          const { input, help } = createValueField(typeSelect.value, currentValue);
+          valueContainer.innerHTML = input + (help || '');
+
           // Re-add event listeners
           valueContainer.querySelector('.variable-value').addEventListener('input', () => updatePreview());
           updatePreview();
@@ -712,12 +740,18 @@
             const options = commandVariable.value.split('\n').filter(opt => opt.trim());
             parts.push(`Options: ${options.join(', ')}`);
           }
+          if (type === 'file') {
+            parts.push(`Base directory: ${commandVariable.value || 'workspace root'}`);
+          }
         } else if (globalVariable) {
           if (type === 'fixed' && globalVariable.value) {
             parts.push(`Value: ${globalVariable.value}`);
           }
           if (type === 'options' && Array.isArray(globalVariable.options)) {
             parts.push(`Options: ${globalVariable.options.join(', ')}`);
+          }
+          if (type === 'file' && globalVariable.value) {
+            parts.push(`Base directory: ${globalVariable.value}`);
           }
           if (globalVariable.description) {
             parts.push(globalVariable.description);
@@ -859,6 +893,10 @@
         `;
         manualInputButton.style.backgroundColor = '#007acc';
         manualInputButton.style.color = 'white';
+        manualInputButton.style.margin = '4px 0';
+        manualInputButton.style.borderRadius = '6px';
+        manualInputButton.style.padding = '10px 12px';
+        manualInputButton.style.fontSize = '13px';
         manualInputButton.addEventListener('click', () => {
           insertVariable('input');
           hideVariableDropdown();
@@ -876,7 +914,12 @@
         variables.forEach(variable => {
           const button = document.createElement('button');
           button.type = 'button';
-          const typeLabel = variable.type === 'options' ? 'Options' : 'Fixed';
+          let typeLabel = 'Fixed';
+          if (variable.type === 'options') {
+            typeLabel = 'Options';
+          } else if (variable.type === 'file') {
+            typeLabel = 'File';
+          }
           const sourceLabel = variable.source === 'global' ? 'Global' : variable.source === 'command' ? 'Command' : 'Command · Global';
           button.innerHTML = `
             <span style="flex:1;">$${variable.key}</span>

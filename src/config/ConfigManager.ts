@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { CommandConfig, ConfigVersion } from '../types';
-import { getDefaultConfig, validateConfig } from './schema';
+import { getDefaultConfig, validateConfig, getDefaultTestRunnerConfig } from './schema';
 
 export class ConfigManager {
   private static instance: ConfigManager;
@@ -26,6 +26,8 @@ export class ConfigManager {
   public async initialize(): Promise<void> {
     await this.loadConfig();
     this.setupFileWatcher();
+    // Ensure initial consumers refresh with loaded config
+    this.notifyConfigChange();
   }
 
   public getConfig(): CommandConfig {
@@ -67,6 +69,12 @@ export class ConfigManager {
         
         if (validation.valid) {
           this.config = parsedConfig;
+          // Ensure testRunners array exists and has at least one default config
+          if (!this.config.testRunners || this.config.testRunners.length === 0) {
+            this.config.testRunners = [getDefaultTestRunnerConfig()];
+            // Save the updated config with default test runner
+            await this.saveConfig(this.config);
+          }
         } else {
           vscode.window.showWarningMessage(
             `Invalid configuration file: ${validation.errors.join(', ')}. Using default configuration.`

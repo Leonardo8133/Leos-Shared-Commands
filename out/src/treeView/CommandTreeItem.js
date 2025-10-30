@@ -45,6 +45,14 @@ class CommandTreeItem extends vscode.TreeItem {
         this.path = path;
         this.commandIndex = commandIndex;
         this._executionState = types_1.ExecutionState.Idle;
+        if (type === 'folder') {
+            const pathKey = path.length ? path.join('/') : 'root';
+            this.id = `folder:${pathKey}`;
+        }
+        else {
+            const command = item;
+            this.id = `command:${command.id}`;
+        }
         this.contextValue = type;
         this.tooltip = this.getTooltip();
         this.iconPath = this.getIcon();

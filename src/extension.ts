@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { ConfigManager } from './config/ConfigManager';
 import { CommandTreeProvider } from './treeView/CommandTreeProvider';
 import { CommandExecutor } from './execution/CommandExecutor';
@@ -82,6 +83,77 @@ export function activate(context: vscode.ExtensionContext) {
 
     const statusBarManager = new StatusBarManager(context, treeProvider, configManager);
     context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView, testRunnerProvider, testRunnerTreeView, codeLensProvider, codeLensRegistration);
+
+    // Editor decorations for test status
+    const decorationTypes = {
+        running: vscode.window.createTextEditorDecorationType({
+            isWholeLine: false,
+            before: { contentText: '⏳ ', color: new vscode.ThemeColor('charts.yellow'), margin: '0 6px 0 0' }
+        }),
+        passed: vscode.window.createTextEditorDecorationType({
+            gutterIconPath: vscode.Uri.file(path.join(__dirname, '..', '..', 'resources', 'yes_9426997.png')),
+            gutterIconSize: 'contain'
+        }),
+        failed: vscode.window.createTextEditorDecorationType({
+            gutterIconPath: vscode.Uri.file(path.join(__dirname, '..', '..', 'resources', 'remove_16597122.png')),
+            gutterIconSize: 'contain'
+        })
+    };
+
+    type TestEditorStatus = 'running' | 'passed' | 'failed';
+    const testStatusById = new Map<string, TestEditorStatus>();
+
+    function updateEditorDecorationsForDocument(document: vscode.TextDocument): void {
+        const editors = vscode.window.visibleTextEditors.filter(e => e.document.uri.toString() === document.uri.toString());
+        if (editors.length === 0) {
+            return;
+        }
+
+        const configs = testRunnerManager.getConfigsForDocument(document);
+        if (configs.length === 0) {
+            for (const editor of editors) {
+                editor.setDecorations(decorationTypes.running, []);
+                editor.setDecorations(decorationTypes.passed, []);
+                editor.setDecorations(decorationTypes.failed, []);
+            }
+            return;
+        }
+
+        const running: vscode.DecorationOptions[] = [];
+        const passed: vscode.DecorationOptions[] = [];
+        const failed: vscode.DecorationOptions[] = [];
+
+        for (const config of configs) {
+            const tests = testRunnerManager.extractTestsFromDocument(document, config);
+            for (const test of tests) {
+                const id = `${config.id}:${document.uri.toString()}:${test.line}`;
+                const status = testStatusById.get(id);
+                if (!status) continue;
+                const target: vscode.DecorationOptions = { range: test.range };
+                if (status === 'running') running.push(target);
+                if (status === 'passed') passed.push(target);
+                if (status === 'failed') failed.push(target);
+            }
+        }
+
+        for (const editor of editors) {
+            editor.setDecorations(decorationTypes.running, running);
+            editor.setDecorations(decorationTypes.passed, passed);
+            editor.setDecorations(decorationTypes.failed, failed);
+        }
+    }
+
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(editor => {
+            if (editor) updateEditorDecorationsForDocument(editor.document);
+        }),
+        vscode.workspace.onDidChangeTextDocument(e => {
+            updateEditorDecorationsForDocument(e.document);
+        }),
+        decorationTypes.running,
+        decorationTypes.passed,
+        decorationTypes.failed
+    );
 
     const applyPosition = () => {
         const configuration = vscode.workspace.getConfiguration('commandManager.documentationHub');
@@ -354,7 +426,7 @@ export function activate(context: vscode.ExtensionContext) {
             try {
                 await configManager.importCommands(fileUri[0].fsPath);
                 treeProvider.refresh();
-                vscode.window.showInformationMessage('Commands imported successfully');
+                vscode.window.showInformationMessage('Tasks imported successfully');
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to import commands: ${error}`);
             }
@@ -372,7 +444,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (fileUri) {
             try {
                 await configManager.exportCommands(fileUri.fsPath);
-                vscode.window.showInformationMessage('Commands exported successfully');
+                vscode.window.showInformationMessage('Tasks exported successfully');
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to export commands: ${error}`);
             }
@@ -457,6 +529,13 @@ export function activate(context: vscode.ExtensionContext) {
         exportCommands
     );
 
+    const newTestRunnerConfiguration = vscode.commands.registerCommand(
+        'testRunner.newConfiguration',
+        () => {
+            webviewManager.showTestRunnerEditor();
+        }
+    );
+
     const openTestRunnerConfiguration = vscode.commands.registerCommand(
         'testRunner.openConfiguration',
         (item?: TestRunnerTreeItem) => {
@@ -476,6 +555,66 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             await testRunnerManager.runAll(item.config);
+        }
+    );
+
+    const runFolderCommand = vscode.commands.registerCommand(
+        'testRunner.runFolder',
+        async (item: TestRunnerTreeItem) => {
+            if (!item || item.itemType !== 'folder' || !item.folderPath) {
+                return;
+            }
+            const tests = testRunnerProvider.getTestsForFolder(item.config, item.folderPath);
+            if (tests.length === 0) {
+                vscode.window.showInformationMessage('No tests found in this folder.');
+                return;
+            }
+            for (const test of tests) {
+                await testRunnerManager.runTest(item.config, test.label, {
+                    file: test.file.fsPath,
+                    line: String(test.line + 1)
+                });
+            }
+        }
+    );
+
+    const runFileCommand = vscode.commands.registerCommand(
+        'testRunner.runFile',
+        async (item: TestRunnerTreeItem) => {
+            if (!item || item.itemType !== 'file' || !item.folderPath || !item.fileName) {
+                return;
+            }
+            const tests = testRunnerProvider.getTestsForFile(item.config, item.folderPath, item.fileName);
+            if (tests.length === 0) {
+                vscode.window.showInformationMessage('No tests found in this file.');
+                return;
+            }
+            for (const test of tests) {
+                await testRunnerManager.runTest(item.config, test.label, {
+                    file: test.file.fsPath,
+                    line: String(test.line + 1)
+                });
+            }
+        }
+    );
+
+    const runTestCaseCommand = vscode.commands.registerCommand(
+        'testRunner.runTestCase',
+        async (item: TestRunnerTreeItem) => {
+            if (!item || item.itemType !== 'testcase' || !item.folderPath || !item.fileName || !item.testCaseName) {
+                return;
+            }
+            const tests = testRunnerProvider.getTestsForTestCase(item.config, item.folderPath, item.fileName, item.testCaseName);
+            if (tests.length === 0) {
+                vscode.window.showInformationMessage('No tests found in this test case.');
+                return;
+            }
+            for (const test of tests) {
+                await testRunnerManager.runTest(item.config, test.label, {
+                    file: test.file.fsPath,
+                    line: String(test.line + 1)
+                });
+            }
         }
     );
 
@@ -526,7 +665,7 @@ export function activate(context: vscode.ExtensionContext) {
         await testRunnerManager.moveConfig(item.config.id, selection.index);
     });
 
-    const hideTestRunnerConfiguration = vscode.commands.registerCommand('testRunner.hideConfiguration', async (item: TestRunnerTreeItem) => {
+    const hideTestRunnerConfiguration = vscode.commands.registerCommand('testRunner.disableConfiguration', async (item: TestRunnerTreeItem) => {
         if (!item || !item.isConfig()) {
             return;
         }
@@ -535,7 +674,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const unhideTestRunnerConfiguration = vscode.commands.registerCommand(
-        'testRunner.unhideConfiguration',
+        'testRunner.enableConfiguration',
         async (item: TestRunnerTreeItem) => {
             if (!item || !item.isConfig()) {
                 return;
@@ -550,6 +689,7 @@ export function activate(context: vscode.ExtensionContext) {
         async (arg1: TestRunnerTreeItem | TestRunnerConfig, arg2?: DiscoveredTest) => {
             let config: TestRunnerConfig | undefined;
             let test: DiscoveredTest | undefined;
+            let treeItem: TestRunnerTreeItem | undefined;
 
             if (arg1 instanceof TestRunnerTreeItem) {
                 if (!arg1.isTest() || !arg1.test) {
@@ -557,6 +697,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 config = arg1.config;
                 test = arg1.test;
+                treeItem = arg1;
             } else {
                 config = arg1;
                 test = arg2;
@@ -566,10 +707,58 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            await testRunnerManager.runTest(config, test.label, {
-                file: test.file.fsPath,
-                line: String(test.line + 1)
-            });
+            // Update test status to running
+            if (treeItem) {
+                treeItem.setStatus('running');
+                testRunnerProvider.refresh(treeItem);
+            }
+
+            // Editor decoration: set running
+            try {
+                const id = `${config.id}:${test.file.toString()}:${test.line}`;
+                testStatusById.set(id, 'running');
+                const doc = await vscode.workspace.openTextDocument(test.file);
+                updateEditorDecorationsForDocument(doc);
+            } catch {}
+
+            try {
+                const passed = await testRunnerManager.runTestWithResult(config, test.label, {
+                    file: test.file.fsPath,
+                    line: String(test.line + 1)
+                });
+                
+                // Update test status to actual result
+                if (treeItem) {
+                    treeItem.setStatus(passed ? 'passed' : 'failed');
+                    testRunnerProvider.refresh(treeItem);
+                }
+
+                // Editor decoration: set passed
+                try {
+                    const id = `${config.id}:${test.file.toString()}:${test.line}`;
+                    testStatusById.set(id, passed ? 'passed' : 'failed');
+                    const doc = await vscode.workspace.openTextDocument(test.file);
+                    updateEditorDecorationsForDocument(doc);
+                } catch {}
+            } catch (error) {
+                // Show error message to user
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Test execution failed: ${errorMessage}`);
+                
+                // Update test status to failed
+                if (treeItem) {
+                    treeItem.setStatus('failed');
+                    testRunnerProvider.refresh(treeItem);
+                }
+
+                // Editor decoration: set failed
+                try {
+                    const id = `${config.id}:${test.file.toString()}:${test.line}`;
+                    testStatusById.set(id, 'failed');
+                    const doc = await vscode.workspace.openTextDocument(test.file);
+                    updateEditorDecorationsForDocument(doc);
+                } catch {}
+            }
         }
     );
 
@@ -626,13 +815,52 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     const expandAllTestRunners = vscode.commands.registerCommand('testRunner.expandAll', async () => {
-        await vscode.commands.executeCommand('workbench.actions.treeView.testRunnerTree.expandAll');
+        const configs = testRunnerManager.getConfigs();
+        for (const config of configs) {
+            const configItem = new TestRunnerTreeItem('config', config);
+            try {
+                await testRunnerTreeView.reveal(configItem, { expand: true, focus: false });
+            } catch (error) {
+                // Item might not be visible yet, continue with next
+                console.debug('Could not reveal config item:', config.title, error);
+            }
+        }
+    });
+
+    const collapseAllTestRunners = vscode.commands.registerCommand('testRunner.collapseAll', async () => {
+        // Refresh the tree view - this will rebuild all items with their default collapsed state
+        // Note: VS Code preserves expansion state, so we need to force a refresh
+        testRunnerProvider.refresh();
+        
+        // Force refresh by waiting and refreshing again to ensure state is reset
+        setTimeout(() => {
+            testRunnerProvider.refresh();
+        }, 50);
+    });
+
+    const refreshTestRunners = vscode.commands.registerCommand('testRunner.refresh', () => {
+        // Clear the test cache and refresh the tree view to rediscover tests
+        testRunnerProvider.refresh();
+    });
+
+    const findTestsForConfig = vscode.commands.registerCommand('testRunner.findTests', async (item: TestRunnerTreeItem) => {
+        if (!item || !item.isConfig()) {
+            return;
+        }
+
+        // Force refresh tests for this configuration
+        testRunnerProvider.refresh(item);
+        vscode.window.showInformationMessage(`Finding tests for "${item.config.title}"...`);
     });
 
     context.subscriptions.push(
+        newTestRunnerConfiguration,
         openTestRunnerConfiguration,
         runAllTestsCommand,
         runConfigurationCommand,
+        runFolderCommand,
+        runFileCommand,
+        runTestCaseCommand,
         moveTestRunnerUp,
         moveTestRunnerDown,
         moveTestRunnerTo,
@@ -641,7 +869,10 @@ export function activate(context: vscode.ExtensionContext) {
         runSingleTestCommand,
         ignoreTestCommand,
         gotoTestCommand,
-        expandAllTestRunners
+        expandAllTestRunners,
+        collapseAllTestRunners,
+        refreshTestRunners,
+        findTestsForConfig
     );
 
     // Documentation hub commands

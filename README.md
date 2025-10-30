@@ -43,9 +43,9 @@ A productivity-focused VS Code extension that centralizes reusable commands, pro
 
 ## 🎯 Quick Start
 
-### 1. Manage Commands
+### 1. Manage Tasks
 1. Open the **Task and Documentation Hub** container in the activity bar
-2. Use the **Commands** tree to add folders and commands
+2. Use the **Tasks** tree to add folders and commands
 3. Configure command text, variables, icons, and terminal preferences
 
 ### 2. Browse Documentation

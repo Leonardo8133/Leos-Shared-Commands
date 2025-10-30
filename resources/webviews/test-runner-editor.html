@@ -34,7 +34,7 @@
       input,
       select,
       textarea {
-        width: 100%;
+        width: 92%;
         padding: 6px 8px;
         border-radius: 4px;
         border: 1px solid var(--vscode-input-border);
@@ -82,17 +82,219 @@
       }
       .danger {
         background: var(--vscode-errorForeground);
-        color: var(--vscode-editor-background);
+        color: white;
       }
       .help-text {
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+        margin-top: 6px;
+        line-height: 1.4;
+      }
+      .variable-name {
+        color: var(--vscode-foreground, #ffffff);
+        font-weight: 600;
+      }
+      .variable-path {
+        color: var(--vscode-foreground, #ffffff);
+        font-weight: 600;
+      }
+      .variable-extension {
+        color: var(--vscode-foreground, #ffffff);
+        font-weight: 600;
+      }
+      .variable-executable {
+        color: #0078d4;
+        font-weight: 600;
+      }
+      .help-text code {
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 11px;
+        background: var(--vscode-textCodeBlock-background);
+        padding: 2px 4px;
+        border-radius: 2px;
+      }
+      .variable-hint {
+        margin-top: 8px;
+        padding: 8px;
+        background: var(--vscode-textBlockQuote-background);
+        border-left: 3px solid var(--vscode-textBlockQuote-border);
+        border-radius: 4px;
+        font-size: 12px;
+        display: none;
+      }
+      .test-list {
+        margin-top: 16px;
+        padding: 12px;
+        background: var(--vscode-editor-background);
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .test-list-title {
         font-size: 11px;
         color: var(--vscode-descriptionForeground);
-        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        font-weight: bold;
+      }
+      .test-list-content { font-size: 12px; color: var(--vscode-foreground); white-space: pre-wrap; word-wrap: break-word; }
+      .test-list-empty {
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
+      }
+      .test-tree-content {
+        font-size: 12px;
+        color: var(--vscode-foreground);
+      }
+      .tree-node {
+        margin: 2px 0;
+        cursor: default;
+      }
+      .tree-folder, .tree-file, .tree-testcase {
+        font-weight: 600;
+        padding: 2px 0;
+        user-select: none;
+      }
+      .tree-folder {
+        color: var(--vscode-textLink-foreground, #0078d4);
+      }
+      .tree-file {
+        color: var(--vscode-foreground);
+      }
+      .tree-testcase {
+        color: var(--vscode-descriptionForeground);
+      }
+      .tree-test {
+        padding-left: 20px;
+        color: var(--vscode-foreground);
+        padding: 2px 0 2px 20px;
+      }
+      .tree-icon {
+        display: inline-block;
+        width: 12px;
+        margin-right: 4px;
+        text-align: center;
+      }
+      .tree-children {
+        margin-left: 16px;
+        display: block;
+      }
+      .toggles-row {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 16px;
+        padding: 12px;
+        background: var(--vscode-editor-background);
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        flex-wrap: wrap;
+      }
+      .toggle-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 150px;
+      }
+      .toggle-item label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0;
+      }
+      .toggle-switch {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+      .toggle-switch input[type="checkbox"] {
+        width: 40px;
+        height: 20px;
+        appearance: none;
+        background: var(--vscode-input-background);
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 10px;
+        position: relative;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .toggle-switch input[type="checkbox"]:checked {
+        background: var(--vscode-button-background);
+      }
+      .toggle-switch input[type="checkbox"]::before {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--vscode-foreground);
+        top: 1px;
+        left: 1px;
+        transition: transform 0.2s;
+      }
+      .toggle-switch input[type="checkbox"]:checked::before {
+        transform: translateX(20px);
+      }
+      .toggle-switch span {
+        font-size: 13px;
+        color: var(--vscode-foreground);
       }
     </style>
   </head>
   <body>
     <h1>Test Runner Configuration</h1>
+    <div class="templates-row" style="display:flex;gap:12px;align-items:center;margin:8px 0 12px 0;flex-wrap:wrap;">
+      <label style="margin:0;">Load template:</label>
+      <select id="templateLanguage" style="width:auto;padding:4px 8px;">
+        <option value="python">Python</option>
+        <option value="javascript">JavaScript</option>
+        <option value="typescript">TypeScript</option>
+        <option value="java">Java</option>
+        <option value="csharp">C#</option>
+        <option value="go">Go</option>
+        <option value="rust">Rust</option>
+        <option value="php">PHP</option>
+        <option value="ruby">Ruby</option>
+        <option value="kotlin">Kotlin</option>
+        <option value="swift">Swift</option>
+        <option value="cpp">C++</option>
+        <option value="scala">Scala</option>
+        <option value="nextjs">Next.js</option>
+        <option value="react">React</option>
+      </select>
+      <select id="templateName" style="width:auto;padding:4px 8px;"></select>
+      <button id="loadTemplate" type="button" class="secondary">Load</button>
+      <span class="help-text" style="margin:0;">Quickly prefill patterns and run command for common libraries.</span>
+    </div>
+    <div class="toggles-row">
+      <div class="toggle-item">
+        <label for="allowNonTest">Allow Non Test</label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="allowNonTest" />
+          <span id="allowNonTestLabel">ON</span>
+        </div>
+        <div class="help-text">Allow functions that doesn't have test in the name to be found</div>
+      </div>
+      <div class="toggle-item">
+        <label for="autoFind">Auto Find</label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="autoFind" checked />
+          <span id="autoFindLabel">ON</span>
+        </div>
+        <div class="help-text">Automatically find tests when the extension load</div>
+      </div>
+      <div class="toggle-item">
+        <label for="inlineButton">Inline Button</label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="inlineButton" checked />
+          <span id="inlineButtonLabel">ON</span>
+        </div>
+        <div class="help-text">Enable an RUN button right above the test name when opened</div>
+      </div>
+    </div>
     <div class="grid">
       <div>
         <label for="title">Title</label>
@@ -101,9 +303,19 @@
       <div>
         <label for="fileType">File type</label>
         <select id="fileType">
-          <option value="javascript">Javascript</option>
-          <option value="typescript">Typescript</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
           <option value="python">Python</option>
+          <option value="java">Java</option>
+          <option value="csharp">C#</option>
+          <option value="go">Go</option>
+          <option value="rust">Rust</option>
+          <option value="php">PHP</option>
+          <option value="ruby">Ruby</option>
+          <option value="kotlin">Kotlin</option>
+          <option value="swift">Swift</option>
+          <option value="cpp">C++</option>
+          <option value="scala">Scala</option>
         </select>
       </div>
       <div>
@@ -142,13 +354,55 @@
     </div>
     <div>
       <label for="command">Run test command</label>
-      <input id="command" type="text" placeholder="npm test -- $test" />
-      <div class="help-text">Use $test to reference the selected test name.</div>
+      <input id="command" type="text" placeholder="python -m unittest $executable_test_path" />
+      <div class="help-text" style="margin-top: 8px;">
+        <div style="margin-bottom: 8px;"><strong>Available variables:</strong></div>
+        <div style="margin-left: 8px; margin-bottom: 4px;">
+          <span class="variable-executable">$executable_test_path</span> - Executable path (default uses dot separator). For Python: module path + class and method (relative to Working directory). Options: <code>$executable_test_path:dot</code>, <code>$executable_test_path:slash</code>, <code>$executable_test_path:hyphen</code>. Default: <code>:dot</code>
+        </div>
+        <div style="margin-left: 8px; margin-bottom: 4px;">
+          <span class="variable-name">$test_name</span> - Test name. For Python, includes the containing class: <code>ClassName.test_method</code> (e.g., <code>Testcase.test_simple_task</code>).
+        </div>
+        <div style="margin-left: 8px; margin-bottom: 4px;">
+          <span class="variable-name">$test_testcase</span> - Test case (class name) only, without method (e.g., <code>Testcase</code>).
+        </div>
+        <div style="margin-left: 8px; margin-bottom: 4px;">
+          <span class="variable-path">$test_file</span> - Test file without extension (e.g., <code>general_test</code>)
+        </div>
+        <div style="margin-left: 8px; margin-bottom: 4px;">
+          <span class="variable-path">$test_path</span> - Test path without extension, relative to workspace. Options: <code>$test_path:dot</code> (separate with dots), <code>$test_path:slash</code> (use forward slashes), <code>$test_path:hyphen</code> (separate with hyphens). Default: forward slashes (e.g., <code>src/test/general_test</code>)
+        </div>
+        <div style="margin-left: 8px; margin-bottom: 4px;">
+          <span class="variable-extension">$test_extension</span> - Test file extension (e.g., <code>.py</code>)
+        </div>
+        <div style="margin-top: 8px; padding: 8px; background: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textBlockQuote-border); border-radius: 4px;">
+          <strong>Format options:</strong> Use <code>:dot</code>, <code>:slash</code>, or <code>:hyphen</code> to control path separators. For example: <code>$test_path:dot</code> converts <code>src/test/file</code> to <code>src.test.file</code>.
+        </div>
+        <div style="margin-top: 8px; padding: 8px; background: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textBlockQuote-border); border-radius: 4px;">
+          <strong>Example:</strong> For file <code>src/test/general_test.py</code> with test method <code>test_simple_task</code> inside class <code>Testcase</code><br/>
+          • <span class="variable-executable">$executable_test_path</span> = <code>src.test.general_test.Testcase.test_simple_task</code> (default: dot)<br/>
+          • <span class="variable-name">$test_name</span> = <code>Testcase.test_simple_task</code><br/>
+          • <span class="variable-name">$test_testcase</span> = <code>Testcase</code><br/>
+          • <span class="variable-path">$test_file</span> = <code>general_test</code><br/>
+          • <span class="variable-path">$test_path</span> = <code>src/test/general_test</code> (default: slash)<br/>
+          • <span class="variable-path">$test_path:dot</span> = <code>src.test.general_test</code><br/>
+          • <span class="variable-extension">$test_extension</span> = <code>.py</code>
+        </div>
+      </div>
+      <div class="variable-hint" id="variableHint"></div>
     </div>
     <div class="actions">
       <button id="runAll" type="button" class="secondary">Run all</button>
       <button id="delete" type="button" class="danger">Delete</button>
       <button id="save" type="button" class="primary">Save</button>
+    </div>
+    <div class="test-list" id="testList" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <div class="test-list-title">Discovered Tests</div>
+        <button id="toggleTreeView" type="button" class="secondary" style="font-size: 11px; padding: 4px 8px;">List View</button>
+      </div>
+      <div class="test-list-content" id="testListContent"></div>
+      <div class="test-tree-content" id="testTreeContent" style="display: none;"></div>
     </div>
     <script nonce="{{nonce}}">
       const vscode = acquireVsCodeApi();
@@ -169,8 +423,33 @@
         command: document.getElementById('command'),
         runAll: document.getElementById('runAll'),
         deleteButton: document.getElementById('delete'),
-        save: document.getElementById('save')
+        save: document.getElementById('save'),
+        testList: document.getElementById('testList'),
+        testListContent: document.getElementById('testListContent'),
+        testTreeContent: document.getElementById('testTreeContent'),
+        toggleTreeView: document.getElementById('toggleTreeView'),
+        allowNonTest: document.getElementById('allowNonTest'),
+        autoFind: document.getElementById('autoFind'),
+        inlineButton: document.getElementById('inlineButton'),
+        templateLanguage: document.getElementById('templateLanguage'),
+        templateName: document.getElementById('templateName'),
+        loadTemplate: document.getElementById('loadTemplate'),
+        allowNonTestLabel: document.getElementById('allowNonTestLabel'),
+        autoFindLabel: document.getElementById('autoFindLabel'),
+        inlineButtonLabel: document.getElementById('inlineButtonLabel'),
+        variableHint: document.getElementById('variableHint')
       };
+
+      // Toggle switch handlers
+      elements.allowNonTest.addEventListener('change', (e) => {
+        elements.allowNonTestLabel.textContent = e.target.checked ? 'ON' : 'OFF';
+      });
+      elements.autoFind.addEventListener('change', (e) => {
+        elements.autoFindLabel.textContent = e.target.checked ? 'ON' : 'OFF';
+      });
+      elements.inlineButton.addEventListener('change', (e) => {
+        elements.inlineButtonLabel.textContent = e.target.checked ? 'ON' : 'OFF';
+      });
 
       function populate(config) {
         state.id = config.id;
@@ -179,12 +458,24 @@
         elements.fileType.value = config.fileType || 'javascript';
         elements.workingDirectory.value = config.workingDirectory || '';
         elements.terminalName.value = config.terminalName || '';
-        elements.activated.checked = !!config.activated;
+        elements.activated.checked = config.activated !== undefined ? config.activated : true;
         elements.filePattern.value = config.fileNamePattern || '';
         elements.testPattern.value = config.testNamePattern || '';
         elements.ignoreList.value = config.ignoreList || '';
         elements.command.value = config.runTestCommand || '';
         elements.deleteButton.disabled = !config.isExisting;
+        
+        // Set toggle switches (default to false if not specified)
+        elements.allowNonTest.checked = config.allowNonTest !== undefined ? config.allowNonTest : false;
+        elements.autoFind.checked = config.autoFind !== undefined ? config.autoFind : true;
+        elements.inlineButton.checked = config.inlineButton !== undefined ? config.inlineButton : true;
+        // Update labels
+        elements.allowNonTestLabel.textContent = elements.allowNonTest.checked ? 'ON' : 'OFF';
+        elements.autoFindLabel.textContent = elements.autoFind.checked ? 'ON' : 'OFF';
+        elements.inlineButtonLabel.textContent = elements.inlineButton.checked ? 'ON' : 'OFF';
+        
+        // Check for variables in command
+        checkVariablesInCommand(elements.command.value);
       }
 
       function collectConfig() {
@@ -198,16 +489,510 @@
           fileNamePattern: elements.filePattern.value,
           testNamePattern: elements.testPattern.value,
           ignoreList: elements.ignoreList.value,
-          runTestCommand: elements.command.value
+          runTestCommand: elements.command.value,
+          allowNonTest: elements.allowNonTest.checked,
+          autoFind: elements.autoFind.checked,
+          inlineButton: elements.inlineButton.checked
         };
+      }
+      
+      function checkVariablesInCommand(commandText) {
+        const variables = ['test_name', 'test_testcase', 'test_file', 'test_path', 'test_extension', 'executable_test_path'];
+        // Match variables with or without format options (e.g., $test_path:dot)
+        const variablePattern = /\$(\w+)(?::\w+)?/g;
+        const found = new Set();
+        let match;
+        while ((match = variablePattern.exec(commandText)) !== null) {
+          const varName = match[1];
+          if (variables.includes(varName)) {
+            found.add(varName);
+          }
+        }
+        
+        if (found.size > 0) {
+          let hintText = 'Tip: You are using ';
+          const parts = Array.from(found).map(v => {
+            const colorClass = v === 'test_name' || v === 'test_testcase' ? 'variable-name' : 
+                              v === 'test_file' || v === 'test_path' ? 'variable-path' :
+                              v === 'test_extension' ? 'variable-extension' : 'variable-executable';
+            return `<span class="${colorClass}">$${v}</span>`;
+          });
+          hintText += parts.join(', ') + ' in your command.';
+          elements.variableHint.innerHTML = hintText;
+          elements.variableHint.style.display = 'block';
+        } else {
+          elements.variableHint.style.display = 'none';
+        }
+      }
+      
+      // Add event listener for command input
+      elements.command.addEventListener('input', (e) => {
+        checkVariablesInCommand(e.target.value);
+      });
+
+      // Templates
+      const templates = {
+        python: [
+          {
+            name: 'unittest',
+            data: {
+              runTestCommand: 'python -m unittest $executable_test_path',
+              fileNamePattern: 'test_*.py\n*_test.py',
+              testNamePattern: 'test_*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'pytest',
+            data: {
+              runTestCommand: 'python -m pytest "$test_path$test_extension" -k "$test_name" -q',
+              fileNamePattern: 'test_*.py\n*_test.py',
+              testNamePattern: 'test_*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'django-test',
+            data: {
+              runTestCommand: 'python manage.py test $executable_test_path',
+              fileNamePattern: 'test_*.py\n*_test.py',
+              testNamePattern: 'test_*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        javascript: [
+          {
+            name: 'jest',
+            data: {
+              runTestCommand: 'npx jest -- $test_path$test_extension -t "$test_name"',
+              fileNamePattern: '*.{test,spec}.js',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'mocha',
+            data: {
+              runTestCommand: 'npx mocha "$test_path$test_extension" -g "$test_name"',
+              fileNamePattern: '*.{test,spec}.js',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        typescript: [
+          {
+            name: 'jest (ts-jest)',
+            data: {
+              runTestCommand: 'npx jest -- $test_path$test_extension -t "$test_name"',
+              fileNamePattern: '*.{test,spec}.ts\n*.{test,spec}.tsx',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'vitest',
+            data: {
+              runTestCommand: 'npx vitest run --passWithNoTests -t "$test_name"',
+              fileNamePattern: '*.{test,spec}.ts\n*.{test,spec}.tsx',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        ruby: [
+          {
+            name: 'rspec',
+            data: {
+              runTestCommand: 'bundle exec rspec "$test_path$test_extension" --example "$test_name"',
+              fileNamePattern: '*_spec.rb',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'minitest',
+            data: {
+              runTestCommand: 'ruby "$test_path$test_extension" --name \'$test_name\'',
+              fileNamePattern: 'test_*.rb',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        nextjs: [
+          {
+            name: 'jest (Next.js)',
+            data: {
+              runTestCommand: 'npx jest -- $test_path$test_extension -t "$test_name"',
+              fileNamePattern: '*.{test,spec}.{js,ts,jsx,tsx}',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        react: [
+          {
+            name: 'jest (React)',
+            data: {
+              runTestCommand: 'npx jest -- $test_path$test_extension -t "$test_name"',
+              fileNamePattern: '*.{test,spec}.{js,jsx,ts,tsx}',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        java: [
+          {
+            name: 'JUnit 5',
+            data: {
+              runTestCommand: 'mvn test -Dtest=$test_path.$test_name',
+              fileNamePattern: '*Test.java\nTest*.java',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'JUnit 4',
+            data: {
+              runTestCommand: 'mvn test -Dtest=$test_path.$test_name',
+              fileNamePattern: '*Test.java\nTest*.java',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'Gradle (JUnit)',
+            data: {
+              runTestCommand: 'gradle test --tests "$test_path.$test_name"',
+              fileNamePattern: '*Test.java\nTest*.java',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'TestNG',
+            data: {
+              runTestCommand: 'mvn test -Dtest=$test_path',
+              fileNamePattern: '*Test.java\nTest*.java',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        go: [
+          {
+            name: 'testing',
+            data: {
+              runTestCommand: 'go test -run "^$test_name$" ./$test_path',
+              fileNamePattern: '*_test.go',
+              testNamePattern: 'Test*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'testify',
+            data: {
+              runTestCommand: 'go test -run "^$test_name$" ./$test_path',
+              fileNamePattern: '*_test.go',
+              testNamePattern: 'Test*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        rust: [
+          {
+            name: 'cargo test',
+            data: {
+              runTestCommand: 'cargo test $test_name --test $test_file',
+              fileNamePattern: '*_test.rs\ntest_*.rs',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        php: [
+          {
+            name: 'PHPUnit',
+            data: {
+              runTestCommand: 'vendor/bin/phpunit --filter "$test_name" "$test_path$test_extension"',
+              fileNamePattern: '*Test.php\nTest*.php',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'Pest',
+            data: {
+              runTestCommand: 'vendor/bin/pest --filter "$test_name" "$test_path$test_extension"',
+              fileNamePattern: '*Test.php\n*.test.php',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        kotlin: [
+          {
+            name: 'JUnit 5',
+            data: {
+              runTestCommand: 'gradle test --tests "$test_path.$test_name"',
+              fileNamePattern: '*Test.kt\nTest*.kt',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          },
+          {
+            name: 'Spek',
+            data: {
+              runTestCommand: 'gradle test --tests "$test_path"',
+              fileNamePattern: '*Spec.kt\n*Specs.kt',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+        swift: [
+          {
+            name: 'XCTest',
+            data: {
+              runTestCommand: 'swift test --filter "$test_path.$test_name"',
+              fileNamePattern: '*Tests.swift\n*Test.swift',
+              testNamePattern: '*',
+              workingDirectory: ''
+            }
+          }
+        ],
+      };
+
+      function refreshTemplateNames() {
+        if (!elements.templateLanguage || !elements.templateName) return;
+        const lang = elements.templateLanguage.value;
+        const list = templates[lang] || [];
+        elements.templateName.innerHTML = '';
+        for (const t of list) {
+          const opt = document.createElement('option');
+          opt.value = t.name;
+          opt.textContent = t.name;
+          elements.templateName.appendChild(opt);
+        }
+        if (list.length > 0) {
+          elements.templateName.selectedIndex = 0;
+        }
+      }
+
+      function initializeTemplateLoader() {
+        if (!elements.templateLanguage || !elements.templateName || !elements.loadTemplate) return;
+
+        elements.templateLanguage.addEventListener('change', refreshTemplateNames);
+        refreshTemplateNames();
+
+        elements.loadTemplate.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            const lang = elements.templateLanguage.value;
+            const name = elements.templateName.value;
+            if (!lang || !name) {
+              vscode.postMessage({ type: 'showError', message: 'Select a language and a template.' });
+              return;
+            }
+            const langTemplates = templates[lang] || [];
+            const tpl = langTemplates.find(t => t.name === name);
+            if (!tpl || !tpl.data) {
+              vscode.postMessage({ type: 'showError', message: 'Template not found.' });
+              return;
+            }
+
+            const d = tpl.data;
+            const langMap = {
+              python: 'python', javascript: 'javascript', typescript: 'typescript',
+              java: 'java', csharp: 'csharp', go: 'go', rust: 'rust', php: 'php',
+              ruby: 'ruby', kotlin: 'kotlin', swift: 'swift', cpp: 'cpp', scala: 'scala'
+            };
+            if (langMap[lang]) elements.fileType.value = langMap[lang];
+            if (d.runTestCommand) elements.command.value = d.runTestCommand;
+            if (d.fileNamePattern !== undefined) elements.filePattern.value = d.fileNamePattern;
+            if (d.testNamePattern !== undefined) elements.testPattern.value = d.testNamePattern;
+            if (d.workingDirectory !== undefined) elements.workingDirectory.value = d.workingDirectory;
+
+            if (typeof checkVariablesInCommand === 'function') {
+              checkVariablesInCommand(elements.command.value);
+            }
+            vscode.postMessage({ type: 'showInfo', message: `Loaded template: ${name}` });
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            vscode.postMessage({ type: 'showError', message: `Template load failed: ${msg}` });
+          }
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeTemplateLoader);
+      } else {
+        initializeTemplateLoader();
       }
 
       window.addEventListener('message', event => {
         const message = event.data;
         if (message.type === 'load') {
           populate({ ...message.config, isExisting: message.isExisting });
+          // iconUris not needed without run buttons
+          if (message.tests) {
+            displayTests(message.tests);
+          } else {
+            hideTestList();
+          }
+        } else if (message.type === 'testsDiscovered') {
+          displayTests(message.tests);
         }
       });
+
+      let treeViewMode = true; // Default to tree view
+      let cachedTests = [];
+
+      function displayTests(tests) {
+        cachedTests = tests || [];
+        if (!tests || tests.length === 0) {
+          elements.testListContent.textContent = 'No tests found';
+          elements.testListContent.className = 'test-list-content test-list-empty';
+          elements.testTreeContent.innerHTML = '';
+          elements.testList.style.display = 'block';
+          return;
+        }
+        
+        if (treeViewMode) {
+          displayTestsAsTree(tests);
+        } else {
+          displayTestsAsList(tests);
+        }
+        elements.testList.style.display = 'block';
+      }
+
+      function displayTestsAsList(tests) {
+        elements.testListContent.className = 'test-list-content';
+        elements.testListContent.style.display = 'block';
+        elements.testTreeContent.style.display = 'none';
+        const text = tests.map((test, index) => {
+          const relativePath = test.filePath || test.file || 'unknown';
+          return `${index + 1}. ${test.label} (${relativePath}:${test.line + 1})`;
+        }).join('\n');
+        elements.testListContent.textContent = `${tests.length} test(s) found:\n\n${text}`;
+      }
+
+      function displayTestsAsTree(tests) {
+        elements.testListContent.style.display = 'none';
+        elements.testTreeContent.style.display = 'block';
+        
+        // Build tree structure: folder -> file -> testcase -> test
+        const tree = {};
+        
+        tests.forEach(test => {
+          const filePath = test.filePath || test.file || 'unknown';
+          const pathParts = filePath.split(/[/\\]/);
+          const fileName = pathParts.pop() || 'unknown';
+          const folderPath = pathParts.join('/') || '.';
+          
+          // Extract test case from label (format: "TestClass.test_method" or "test_method")
+          const labelParts = test.label.split('.');
+          let testCase = '';
+          let testMethod = test.label;
+          if (labelParts.length > 1) {
+            testCase = labelParts[0];
+            testMethod = labelParts.slice(1).join('.');
+          }
+          
+          // Build tree structure
+          if (!tree[folderPath]) {
+            tree[folderPath] = {};
+          }
+          if (!tree[folderPath][fileName]) {
+            tree[folderPath][fileName] = {};
+          }
+          if (testCase && !tree[folderPath][fileName][testCase]) {
+            tree[folderPath][fileName][testCase] = [];
+          }
+          let target;
+          if (testCase) {
+            if (!tree[folderPath][fileName][testCase]) {
+              tree[folderPath][fileName][testCase] = [];
+            }
+            target = tree[folderPath][fileName][testCase];
+          } else {
+            if (!tree[folderPath][fileName]['__noTestCase__']) {
+              tree[folderPath][fileName]['__noTestCase__'] = [];
+            }
+            target = tree[folderPath][fileName]['__noTestCase__'];
+          }
+          target.push({ method: testMethod, line: test.line + 1, label: test.label, filePath });
+        });
+        
+        // Render tree
+        let html = '<div style="margin-bottom: 8px; color: var(--vscode-descriptionForeground);">' + tests.length + ' test(s) found:</div>';
+        
+        const folderKeys = Object.keys(tree).sort();
+        folderKeys.forEach(folderPath => {
+          const folderName = folderPath === '.' ? 'Root' : folderPath.split('/').pop();
+          html += `<div class="tree-node">
+            <div class="tree-folder">
+              <span class="tree-icon">📁</span>${folderName}
+            </div>
+            <div class="tree-children">`;
+          
+          const fileKeys = Object.keys(tree[folderPath]).sort();
+          fileKeys.forEach(fileName => {
+            html += `<div class="tree-node">
+              <div class="tree-file">
+                <span class="tree-icon">📄</span>${fileName}
+              </div>
+              <div class="tree-children">`;
+            
+            const testCaseKeys = Object.keys(tree[folderPath][fileName]).sort();
+            testCaseKeys.forEach(testCase => {
+              if (testCase === '__noTestCase__') {
+                // Tests without a test case
+                tree[folderPath][fileName][testCase].forEach(test => {
+                  html += `<div class="tree-test">
+                    <span class="tree-icon">•</span>${test.method} <span style="color: var(--vscode-descriptionForeground); font-size: 11px;">(${test.line})</span>
+                  </div>`;
+                });
+              } else {
+                html += `<div class="tree-node">
+                  <div class="tree-testcase">
+                    <span class="tree-icon">🧩</span>${testCase}
+                  </div>
+                  <div class="tree-children">`;
+                tree[folderPath][fileName][testCase].forEach(test => {
+                  // Display only method name, without test case prefix
+                  const methodName = test.label.includes('.') ? test.label.split('.').slice(1).join('.') : test.method;
+                  html += `<div class="tree-test">
+                    <span class="tree-icon">✓</span>${methodName} <span style="color: var(--vscode-descriptionForeground); font-size: 11px;">(${test.line})</span>
+                  </div>`;
+                });
+                html += `</div></div>`;
+              }
+            });
+            
+            html += `</div></div>`;
+          });
+          
+          html += `</div></div>`;
+        });
+        
+        elements.testTreeContent.innerHTML = html;
+      }
+
+      elements.toggleTreeView.addEventListener('click', () => {
+        treeViewMode = !treeViewMode;
+        elements.toggleTreeView.textContent = treeViewMode ? 'List View' : 'Tree View';
+        if (cachedTests.length > 0) {
+          displayTests(cachedTests);
+      }
+      });
+
+      function hideTestList() {
+        elements.testList.style.display = 'none';
+      }
 
       elements.save.addEventListener('click', () => {
         vscode.postMessage({
@@ -218,13 +1003,14 @@
 
       elements.deleteButton.addEventListener('click', () => {
         if (!state.isExisting) {
-          vscode.postMessage({ type: 'deleteTestRunner', id: state.id });
+          // For new configs, just close the editor
+          vscode.postMessage({ type: 'cancel' });
           return;
         }
 
-        const confirmed = confirm('Delete this test runner configuration?');
-        if (confirmed) {
-          vscode.postMessage({ type: 'deleteTestRunner', id: state.id });
+        // Request deletion confirmation from the extension
+        if (state.id) {
+          vscode.postMessage({ type: 'requestDeleteTestRunner', id: state.id });
         }
       });
 
