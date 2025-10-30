@@ -1,45 +1,83 @@
 {
   "folders": [
     {
-      "name": "Samples",
-      "icon": "$(beaker)",
+      "name": "Javascript",
+      "icon": "$(library)",
       "commands": [
-        {
-          "id": "hello-world",
-          "label": "Echo Hello",
-          "command": "echo \"Hello from Command Manager\"",
-          "terminal": {
-            "type": "vscode-new",
-            "name": "Command Manager",
-            "keepOpen": true
-          },
-          "description": "Sample command that echoes a welcome message"
-        },
-        {
-          "id": "build-environment",
-          "label": "Build for environment",
-          "command": "npm run build -- --env $ENVIRONMENT_NAME",
-          "terminal": {
-            "type": "vscode-current",
-            "keepOpen": true
-          },
-          "variables": [
-            {
-              "key": "ENVIRONMENT_NAME",
-              "value": "production\ndevelopment\nstaging",
-              "label": "Environment",
-              "type": "options"
-            }
-          ],
-          "description": "Builds the project using one of the configured environments"
-        },
         {
           "id": "compile",
           "label": "Compile",
+          "icon": "$(lock)",
           "command": "npm run compile",
           "terminal": {
             "type": "vscode-new",
             "name": "compile"
+          },
+          "variables": []
+        },
+        {
+          "id": "watch",
+          "label": "Watch",
+          "description": "Compile and watch TypeScript and HTML changes",
+          "icon": "$(watch)",
+          "command": "npm run watch",
+          "terminal": {
+            "type": "vscode-current"
+          },
+          "variables": []
+        },
+        {
+          "id": "run-js-tests",
+          "label": "Run JS Tests",
+          "description": "Run extension unit tests",
+          "icon": "$(beaker)",
+          "command": "npm test",
+          "terminal": {
+            "type": "vscode-current",
+            "name": "JS Tests"
+          },
+          "variables": []
+        },
+        {
+          "id": "run-ui-tests",
+          "label": "Run UI tests",
+          "description": "Run WebdriverIO UI tests",
+          "icon": "$(beaker)",
+          "command": "npm run test:ui",
+          "terminal": {
+            "type": "vscode-current",
+            "name": "UI Tests"
+          },
+          "variables": []
+        }
+      ],
+      "subfolders": []
+    },
+    {
+      "name": "Python",
+      "icon": "$(symbol-method)",
+      "commands": [
+        {
+          "id": "python-unittests",
+          "label": "Run python tests",
+          "description": "Run Python unittests (discover)",
+          "icon": "$(play)",
+          "command": "python -m unittest discover",
+          "terminal": {
+            "type": "vscode-current",
+            "name": "Python Tests"
+          },
+          "variables": []
+        },
+        {
+          "id": "django-runserver",
+          "label": "Run site",
+          "description": "Run server (prompt for host:port)",
+          "icon": "$(tools)",
+          "command": "python manage.py runserver $input",
+          "terminal": {
+            "type": "vscode-current",
+            "name": "Django"
           },
           "variables": []
         }
@@ -66,6 +104,23 @@
       "description": "Common deployment targets"
     }
   ],
-  "version": 2,
-  "lastModified": "2025-10-30T00:56:48.572Z"
+  "version": 14,
+  "lastModified": "2025-10-30T02:07:19.235Z",
+  "testRunners": [
+    {
+      "id": "test-runner-default",
+      "activated": true,
+      "title": "JavaScript Tests",
+      "fileType": "javascript",
+      "workingDirectory": "",
+      "fileNamePattern": "test_*\n*test*\n*.spec.*",
+      "testNamePattern": "*",
+      "ignoreList": "",
+      "runTestCommand": "npm test -- $test_name",
+      "terminalName": "Test Runner",
+      "allowNonTest": false,
+      "autoFind": true,
+      "inlineButton": true
+    }
+  ]
 }

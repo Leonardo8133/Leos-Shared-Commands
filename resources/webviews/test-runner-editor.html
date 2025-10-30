@@ -791,39 +791,39 @@
           e.preventDefault();
           e.stopPropagation();
           try {
-            const lang = elements.templateLanguage.value;
-            const name = elements.templateName.value;
-            if (!lang || !name) {
+          const lang = elements.templateLanguage.value;
+          const name = elements.templateName.value;
+          if (!lang || !name) {
               vscode.postMessage({ type: 'showError', message: 'Select a language and a template.' });
-              return;
-            }
+            return;
+          }
             const langTemplates = templates[lang] || [];
-            const tpl = langTemplates.find(t => t.name === name);
+          const tpl = langTemplates.find(t => t.name === name);
             if (!tpl || !tpl.data) {
               vscode.postMessage({ type: 'showError', message: 'Template not found.' });
-              return;
-            }
-
-            const d = tpl.data;
-            const langMap = {
+            return;
+          }
+          
+          const d = tpl.data;
+          const langMap = {
               python: 'python', javascript: 'javascript', typescript: 'typescript',
               java: 'java', csharp: 'csharp', go: 'go', rust: 'rust', php: 'php',
               ruby: 'ruby', kotlin: 'kotlin', swift: 'swift', cpp: 'cpp', scala: 'scala'
-            };
+          };
             if (langMap[lang]) elements.fileType.value = langMap[lang];
             if (d.runTestCommand) elements.command.value = d.runTestCommand;
             if (d.fileNamePattern !== undefined) elements.filePattern.value = d.fileNamePattern;
             if (d.testNamePattern !== undefined) elements.testPattern.value = d.testNamePattern;
             if (d.workingDirectory !== undefined) elements.workingDirectory.value = d.workingDirectory;
-
-            if (typeof checkVariablesInCommand === 'function') {
-              checkVariablesInCommand(elements.command.value);
-            }
+          
+          if (typeof checkVariablesInCommand === 'function') {
+            checkVariablesInCommand(elements.command.value);
+          }
             vscode.postMessage({ type: 'showInfo', message: `Loaded template: ${name}` });
-          } catch (error) {
+        } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);
             vscode.postMessage({ type: 'showError', message: `Template load failed: ${msg}` });
-          }
+        }
         });
       }
 

@@ -2,7 +2,7 @@
   "name": "command-manager",
   "displayName": "Task and Documentation Hub",
   "description": "Manage reusable commands, documentation, and automated test runners inside VS Code",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "LeonardoSouza",
   "author": {
     "name": "Leonardo de Souza Chaves",

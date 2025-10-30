@@ -74,7 +74,14 @@ class TestRunnerTreeItem extends vscode.TreeItem {
         if (itemType === 'config') {
             this.id = `test-runner-config-${config.id}`;
             this.description = config.activated ? config.fileType : `${config.fileType} • inactive`;
-            this.iconPath = new vscode.ThemeIcon(config.activated ? 'beaker' : 'eye-closed');
+            // Colored beaker icon per language when active; eye-closed when inactive
+            if (config.activated) {
+                const color = this.getLanguageThemeColor(config.fileType);
+                this.iconPath = color ? new vscode.ThemeIcon('beaker', color) : new vscode.ThemeIcon('beaker');
+            }
+            else {
+                this.iconPath = new vscode.ThemeIcon('eye-closed');
+            }
             this.contextValue = config.activated ? 'testRunnerConfigActive' : 'testRunnerConfigInactive';
             this.tooltip = new vscode.MarkdownString(`**${config.title}**\n\nFile pattern: ${config.fileNamePattern || '—'}\nTest pattern: ${config.testNamePattern || '—'}`);
         }
@@ -85,7 +92,7 @@ class TestRunnerTreeItem extends vscode.TreeItem {
         }
         else if (itemType === 'file') {
             this.id = `test-runner-file-${config.id}-${folderPath}-${fileName}`;
-            this.iconPath = new vscode.ThemeIcon('file');
+            this.iconPath = this.getFileIconByLanguage(fileName || '', config.fileType);
             this.contextValue = 'testRunnerFile';
         }
         else if (itemType === 'testcase') {
@@ -134,6 +141,52 @@ class TestRunnerTreeItem extends vscode.TreeItem {
     setStatus(status) {
         this.testStatus = status;
         this.updateIcon();
+    }
+    getLanguageThemeColor(fileType) {
+        const colorByLang = {
+            javascript: 'terminal.ansiYellow',
+            typescript: 'terminal.ansiCyan',
+            python: 'terminal.ansiBlue',
+            ruby: 'terminal.ansiRed',
+            java: 'terminal.ansiMagenta',
+            csharp: 'terminal.ansiGreen',
+            go: 'terminal.ansiBlue',
+            rust: 'terminal.ansiRed',
+            php: 'terminal.ansiMagenta',
+            kotlin: 'terminal.ansiMagenta',
+            swift: 'terminal.ansiRed',
+            scala: 'terminal.ansiMagenta',
+            cpp: 'terminal.ansiBlue'
+        };
+        const key = (fileType || '').toLowerCase();
+        const colorId = colorByLang[key];
+        return colorId ? new vscode.ThemeColor(colorId) : undefined;
+    }
+    getFileIconByLanguage(fileName, fileType) {
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
+        // Prefer extension first, fallback to config fileType
+        const lang = ext === 'js' || ext === 'jsx' ? 'javascript' :
+            ext === 'ts' || ext === 'tsx' ? 'typescript' :
+                ext === 'py' ? 'python' :
+                    ext === 'rb' ? 'ruby' :
+                        ext === 'java' ? 'java' :
+                            ext === 'cs' ? 'csharp' :
+                                ext === 'go' ? 'go' :
+                                    ext === 'rs' ? 'rust' :
+                                        fileType;
+        // Color map using VS Code built-in ANSI theme colors
+        const colorByLang = {
+            javascript: 'terminal.ansiYellow',
+            typescript: 'terminal.ansiCyan',
+            python: 'terminal.ansiBlue',
+            ruby: 'terminal.ansiRed',
+            java: 'terminal.ansiMagenta',
+            csharp: 'terminal.ansiGreen',
+            go: 'terminal.ansiBlue',
+            rust: 'terminal.ansiRed'
+        };
+        const colorKey = colorByLang[lang] || undefined;
+        return colorKey ? new vscode.ThemeIcon('symbol-file', new vscode.ThemeColor(colorKey)) : new vscode.ThemeIcon('symbol-file');
     }
     isConfig() {
         return this.itemType === 'config';
