@@ -262,7 +262,6 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
         const raw = await transferItem.asString();
         dragItems = JSON.parse(raw) as DraggedTreeItem[];
       } catch (error) {
-        console.warn('Failed to parse drag data', error);
         return;
       }
     }
@@ -419,7 +418,7 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
         }
       }
     } catch (error) {
-      console.warn('Failed to parse drop metadata', error);
+      // Silent fail
     }
 
     return 'before';

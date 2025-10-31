@@ -141,7 +141,7 @@ export class ConfigManager {
       try {
         callback();
       } catch (error) {
-        console.warn('Config change callback failed', error);
+        // Silent fail
       }
     }
   }
@@ -173,7 +173,7 @@ export class ConfigManager {
         versions = JSON.parse(versionsData);
       }
     } catch (error) {
-      console.warn('Failed to load versions file:', error);
+      // Silent fail
     }
 
     // Add current config as version
@@ -192,7 +192,7 @@ export class ConfigManager {
     try {
       await fs.promises.writeFile(versionsPath, JSON.stringify(versions, null, 2), 'utf8');
     } catch (error) {
-      console.warn('Failed to save versions file:', error);
+      // Silent fail
     }
   }
 
@@ -205,7 +205,7 @@ export class ConfigManager {
         return JSON.parse(versionsData);
       }
     } catch (error) {
-      console.warn('Failed to load versions file:', error);
+      // Silent fail
     }
     
     return [];

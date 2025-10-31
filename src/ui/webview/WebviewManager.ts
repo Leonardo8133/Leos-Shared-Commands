@@ -262,19 +262,13 @@ export class WebviewManager {
         case 'saveTestRunner':
           try {
             const sanitized = this.sanitizeTestRunnerInput(message.config);
-            console.log('[WebviewManager] ========== SAVE TEST RUNNER START ==========');
-            console.log('[WebviewManager] Saving test runner config:', JSON.stringify(sanitized, null, 2));
             
             await this.testRunnerManager.saveConfig(sanitized);
-            console.log('[WebviewManager] Config saved successfully');
             // Do NOT trigger discovery on save to avoid loops; just update editor state
             this.sendTestRunnerState(sanitized, true);
-            console.log('[WebviewManager] ========== SAVE TEST RUNNER END ==========');
             vscode.window.showInformationMessage(`Saved test runner "${sanitized.title}".`);
           } catch (error) {
             const messageText = error instanceof Error ? error.message : String(error);
-            console.error('[WebviewManager] ERROR saving test runner:', error);
-            console.error('[WebviewManager] Error stack:', error instanceof Error ? error.stack : 'No stack');
             vscode.window.showErrorMessage(`Failed to save test runner: ${messageText}`);
           }
           break;

@@ -31,12 +31,11 @@ async function applyDocumentationViewPosition(position: DocumentationPosition): 
             });
         }
     } catch (error) {
-        console.warn('Failed to apply documentation hub position', error);
+        // Silent fail
     }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('Task and Documentation Hub extension is now active!');
 
     // Initialize managers
     const configManager = ConfigManager.getInstance();
@@ -893,7 +892,6 @@ export async function activate(context: vscode.ExtensionContext) {
                 await testRunnerTreeView.reveal(configItem, { expand: true, focus: false });
             } catch (error) {
                 // Item might not be visible yet, continue with next
-                console.debug('Could not reveal config item:', config.title, error);
             }
         }
     });
@@ -931,6 +929,10 @@ export async function activate(context: vscode.ExtensionContext) {
         setTimeout(() => { void vscode.commands.executeCommand('testRunner.refresh'); }, 200);
     });
 
+    const searchTests = vscode.commands.registerCommand('testRunner.search', async () => {
+        await testRunnerProvider.setSearchQuery();
+    });
+
     context.subscriptions.push(
         newTestRunnerConfiguration,
         openTestRunnerConfiguration,
@@ -951,7 +953,8 @@ export async function activate(context: vscode.ExtensionContext) {
         expandAllTestRunners,
         collapseAllTestRunners,
         refreshTestRunners,
-        findTestsForConfig
+        findTestsForConfig,
+        searchTests
     );
 
     // Documentation hub commands

@@ -481,10 +481,7 @@
       }
 
       function handleExportConfig() {
-        console.log('Export button clicked, currentConfig:', currentConfig);
-        
         if (!currentConfig) {
-          console.log('No currentConfig available, showing error');
           vscode.postMessage({ type: 'error', message: 'No configuration to export' });
           return;
         }
@@ -501,10 +498,7 @@
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          
-          console.log('Export completed successfully');
         } catch (error) {
-          console.error('Export error:', error);
           vscode.postMessage({ type: 'error', message: 'Failed to export configuration: ' + error.message });
         }
       }
@@ -554,16 +548,11 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM loaded, setting up event listeners');
-        console.log('exportConfig element:', elements.exportConfig);
-        
         elements.addVariable.addEventListener('click', () => {
           addVariableRow();
         });
         elements.saveJson.addEventListener('click', handleSaveJson);
         elements.exportConfig.addEventListener('click', () => {
-          console.log('Export button clicked!');
-          alert('Export button clicked!'); // Temporary debug
           handleExportConfig();
         });
         elements.importConfig.addEventListener('click', handleImportConfig);

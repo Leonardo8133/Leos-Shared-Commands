@@ -12,6 +12,7 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
   private testStatusCache: Map<string, TestStatus> = new Map(); // Cache for test statuses (by test ID)
   private parentStatusCache: Map<string, TestStatus> = new Map(); // Cache for parent item statuses (folder/file/testcase)
   private managerSubscription: vscode.Disposable | undefined;
+  private searchQuery: string = '';
 
   constructor(private readonly manager: TestRunnerManager) {
     this.managerSubscription = this.manager.onDidChange(() => {
@@ -146,7 +147,11 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
 
   async getChildren(element?: TestRunnerTreeItem): Promise<TestRunnerTreeItem[]> {
     if (!element) {
-      return this.getConfigItems();
+      const items: TestRunnerTreeItem[] = [];
+      items.push(this.createSearchItem());
+      const configItems = await this.getConfigItems();
+      items.push(...configItems);
+      return items;
     }
 
     if (element.isConfig()) {
@@ -201,9 +206,61 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
     return undefined;
   }
 
+  private createSearchItem(): TestRunnerTreeItem {
+    const label = this.searchQuery ? `Search: ${this.searchQuery}` : 'Search tests...';
+    // Create a minimal config for the search item if no configs exist
+    const configs = this.manager.getConfigs();
+    const config = configs.length > 0 ? configs[0] : {
+      id: 'search-placeholder',
+      title: 'Search',
+      fileType: 'javascript' as const,
+      fileNamePattern: '',
+      testNamePattern: '',
+      runTestCommand: '',
+      activated: true
+    };
+    const item = new TestRunnerTreeItem('placeholder', config, undefined, label);
+    item.iconPath = new vscode.ThemeIcon('search');
+    item.command = {
+      command: 'testRunner.search',
+      title: 'Search Tests'
+    };
+    return item;
+  }
+
+  public async setSearchQuery(): Promise<void> {
+    const input = await vscode.window.showInputBox({
+      prompt: 'Search tests',
+      placeHolder: 'Type to filter by config, folder, file, test case, or test name',
+      value: this.searchQuery
+    });
+
+    if (typeof input === 'undefined') {
+      return;
+    }
+
+    this.searchQuery = input || '';
+    this.refresh();
+  }
+
+  private matchesSearchQuery(text: string): boolean {
+    if (!this.searchQuery) {
+      return true;
+    }
+    return text.toLowerCase().includes(this.searchQuery.toLowerCase());
+  }
+
   private async getConfigItems(): Promise<TestRunnerTreeItem[]> {
     const configs = this.manager.getConfigs();
-    return configs.map(config => {
+    const filtered = configs.filter(config => {
+      if (!this.searchQuery) {
+        return true;
+      }
+      // Match by config title or file type
+      return this.matchesSearchQuery(config.title) || this.matchesSearchQuery(config.fileType);
+    });
+    
+    return filtered.map(config => {
       const item = new TestRunnerTreeItem('config', config);
       const tests = this.testsCache.get(config.id) || [];
       const count = tests.length;
@@ -248,25 +305,43 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
       folderMap.get(folderPath)!.push(test);
     }
 
-    const folders = Array.from(folderMap.keys()).sort().map(folderPath => {
-      const item = new TestRunnerTreeItem('folder', config, undefined, undefined, folderPath);
-      const tests = folderMap.get(folderPath) || [];
-      const count = tests.length;
-      item.description = `${count} test${count !== 1 ? 's' : ''} found`;
-      
-      // Calculate status from child tests
-      const status = this.calculateParentStatus(tests);
-      if (status) {
-        item.setStatus(status);
-      } else {
-        // Fallback to cached status if no child tests have status
-        const cachedStatus = this.getParentStatus(config.id, 'folder', folderPath);
-        if (cachedStatus) {
-          item.setStatus(cachedStatus);
+    const folders = Array.from(folderMap.keys()).sort()
+      .filter(folderPath => {
+        if (!this.searchQuery) {
+          return true;
         }
-      }
-      return item;
-    });
+        // Match by folder name or if any child test/file matches
+        const folderName = folderPath === '.' ? 'Root' : folderPath.split('/').pop() || folderPath;
+        if (this.matchesSearchQuery(folderName) || this.matchesSearchQuery(folderPath)) {
+          return true;
+        }
+        // Check if any child file or test matches
+        const tests = folderMap.get(folderPath) || [];
+        return tests.some(test => {
+          const relativePath = vscode.workspace.asRelativePath(test.file, false);
+          const fileName = relativePath.split(/[/\\]/).pop() || '';
+          return this.matchesSearchQuery(fileName) || this.matchesSearchQuery(test.label);
+        });
+      })
+      .map(folderPath => {
+        const item = new TestRunnerTreeItem('folder', config, undefined, undefined, folderPath);
+        const tests = folderMap.get(folderPath) || [];
+        const count = tests.length;
+        item.description = `${count} test${count !== 1 ? 's' : ''} found`;
+        
+        // Calculate status from child tests
+        const status = this.calculateParentStatus(tests);
+        if (status) {
+          item.setStatus(status);
+        } else {
+          // Fallback to cached status if no child tests have status
+          const cachedStatus = this.getParentStatus(config.id, 'folder', folderPath);
+          if (cachedStatus) {
+            item.setStatus(cachedStatus);
+          }
+        }
+        return item;
+      });
 
     return folders;
   }
@@ -293,26 +368,41 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
       fileMap.get(fileName)!.push(test);
     }
 
-    return Array.from(fileMap.keys()).sort().map(fileName => {
-      const item = new TestRunnerTreeItem('file', config, undefined, undefined, folderPath, fileName);
-      const tests = fileMap.get(fileName) || [];
-      const count = tests.length;
-      item.description = `${count} test${count !== 1 ? 's' : ''} found`;
-      const key = `${folderPath}/${fileName}`;
-      
-      // Calculate status from child tests
-      const status = this.calculateParentStatus(tests);
-      if (status) {
-        item.setStatus(status);
-      } else {
-        // Fallback to cached status if no child tests have status
-        const cachedStatus = this.getParentStatus(config.id, 'file', key);
-        if (cachedStatus) {
-          item.setStatus(cachedStatus);
+    return Array.from(fileMap.keys()).sort()
+      .filter(fileName => {
+        if (!this.searchQuery) {
+          return true;
         }
-      }
-      return item;
-    });
+        // Match by file name or if any child test/testcase matches
+        if (this.matchesSearchQuery(fileName)) {
+          return true;
+        }
+        // Check if any child test matches
+        const tests = fileMap.get(fileName) || [];
+        return tests.some(test => {
+          return this.matchesSearchQuery(test.label);
+        });
+      })
+      .map(fileName => {
+        const item = new TestRunnerTreeItem('file', config, undefined, undefined, folderPath, fileName);
+        const tests = fileMap.get(fileName) || [];
+        const count = tests.length;
+        item.description = `${count} test${count !== 1 ? 's' : ''} found`;
+        const key = `${folderPath}/${fileName}`;
+        
+        // Calculate status from child tests
+        const status = this.calculateParentStatus(tests);
+        if (status) {
+          item.setStatus(status);
+        } else {
+          // Fallback to cached status if no child tests have status
+          const cachedStatus = this.getParentStatus(config.id, 'file', key);
+          if (cachedStatus) {
+            item.setStatus(cachedStatus);
+          }
+        }
+        return item;
+      });
   }
 
   private async getTestCases(config: TestRunnerConfig, folderPath: string, fileName: string): Promise<TestRunnerTreeItem[]> {
@@ -347,6 +437,12 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
     
     // Add test cases first
     for (const [testCase, tests] of Array.from(testCaseMap.entries()).sort()) {
+      // Filter test cases by search query
+      if (this.searchQuery && !this.matchesSearchQuery(testCase) && 
+          !tests.some(test => this.matchesSearchQuery(test.label))) {
+        continue;
+      }
+      
       const item = new TestRunnerTreeItem('testcase', config, undefined, undefined, folderPath, fileName, testCase);
       const count = tests.length;
       item.description = `${count} test${count !== 1 ? 's' : ''} found`;
@@ -368,6 +464,11 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
 
     // Add tests without test case as direct children (no testcase wrapper)
     for (const test of noTestCaseTests) {
+      // Filter tests by search query
+      if (this.searchQuery && !this.matchesSearchQuery(test.label)) {
+        continue;
+      }
+      
       const item = new TestRunnerTreeItem('test', config, test);
       const status = this.testStatusCache.get(test.id);
       if (status) {
@@ -396,14 +497,21 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
       return labelParts.length > 1 && labelParts[0] === testCaseName;
     });
 
-    return tests.map(test => {
-      const item = new TestRunnerTreeItem('test', config, test);
-      const status = this.testStatusCache.get(test.id);
-      if (status) {
-        item.setStatus(status);
-      }
-      return item;
-    });
+    return tests
+      .filter(test => {
+        if (!this.searchQuery) {
+          return true;
+        }
+        return this.matchesSearchQuery(test.label);
+      })
+      .map(test => {
+        const item = new TestRunnerTreeItem('test', config, test);
+        const status = this.testStatusCache.get(test.id);
+        if (status) {
+          item.setStatus(status);
+        }
+        return item;
+      });
   }
 
   public getTestsForFolder(config: TestRunnerConfig, folderPath: string): DiscoveredTest[] {

@@ -9,7 +9,7 @@ export enum DebugTag {
 }
 
 export class DebugLogger {
-  private static enabled = true;
+  private static enabled = false;
   private static outputChannel: vscode.OutputChannel | undefined;
 
   public static initialize(): void {
@@ -39,13 +39,6 @@ export class DebugLogger {
       }
       this.outputChannel.appendLine('-------------------------');
     }
-    
-    // Also log to console for test visibility
-    console.log(logMessage);
-    if (details !== undefined) {
-      console.log(JSON.stringify(details, null, 2));
-    }
-    console.log('-------------------------');
   }
 
   public static section(title: string): void {
@@ -61,10 +54,6 @@ export class DebugLogger {
       this.outputChannel.appendLine(`  ${title}`);
       this.outputChannel.appendLine(separator);
     }
-    console.log('');
-    console.log(separator);
-    console.log(`  ${title}`);
-    console.log(separator);
   }
 
   public static show(): void {

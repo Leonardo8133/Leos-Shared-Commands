@@ -2,7 +2,7 @@
   "name": "command-manager",
   "displayName": "Tasks, Tests & Doc Hub",
   "description": "Manage reusable commands, documentation, and automated test runners inside VS Code",
-  "version": "1.3.0",
+  "version": "1.3.2",
   "publisher": "LeonardoSouza",
   "author": {
     "name": "Leonardo de Souza Chaves",
@@ -12,17 +12,33 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Development Tools",
+    "Productivity"
   ],
   "keywords": [
     "command",
     "manager",
+    "commands",
+    "task",
+    "tasks",
+    "test",
+    "test runner",
+    "testing",
+    "pytest",
+    "jest",
+    "mocha",
     "variables",
     "terminal",
-    "options",
-    "readme",
     "documentation",
-    "list"
+    "docs",
+    "readme",
+    "markdown",
+    "productivity",
+    "automation",
+    "scripts",
+    "runner",
+    "execute"
   ],
   "repository": {
     "type": "git",
@@ -36,14 +52,14 @@
     "onStartupFinished"
   ],
   "main": "./out/src/extension.js",
-  "icon": "resources/add-list.png",
+  "icon": "resources/extension-icon.png",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "command-manager",
-          "title": "Task and Documentation Hub",
-          "icon": "resources/add-list.png"
+          "title": "Tasks, Tests & Doc Hub",
+          "icon": "resources/activitybar-icon.png"
         }
       ]
     },
@@ -248,6 +264,12 @@
         "category": "Task and Documentation Hub"
       },
       {
+        "command": "testRunner.search",
+        "title": "Test Runner: Search",
+        "icon": "$(search)",
+        "category": "Task and Documentation Hub"
+      },
+      {
         "command": "testRunner.findTests",
         "title": "Find Tests",
         "icon": "$(search)",
@@ -365,9 +387,14 @@
           "group": "navigation@4"
         },
         {
-          "command": "testRunner.refresh",
+          "command": "testRunner.search",
           "when": "view == testRunnerTree",
           "group": "navigation@5"
+        },
+        {
+          "command": "testRunner.refresh",
+          "when": "view == testRunnerTree",
+          "group": "navigation@6"
         }
       ],
       "view/item/context": [

@@ -277,7 +277,6 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
 
       return { sections, content: document.getText() };
     } catch (error) {
-      console.warn('Failed to parse sections for', uri.fsPath, error);
       return { sections: [], content: '' };
     }
   }
