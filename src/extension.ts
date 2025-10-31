@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ConfigManager } from './config/ConfigManager';
-import { CommandTreeProvider } from './treeView/CommandTreeProvider';
-import { CommandExecutor } from './execution/CommandExecutor';
+import { CommandTreeProvider } from '../apps/tasks/treeView/CommandTreeProvider';
+import { CommandExecutor } from '../apps/tasks/execution/CommandExecutor';
 import { WebviewManager } from './ui/webview/WebviewManager';
-import { CommandTreeItem } from './treeView/CommandTreeItem';
-import { DocumentationTreeProvider } from './documentation/DocumentationTreeProvider';
+import { CommandTreeItem } from '../apps/tasks/treeView/CommandTreeItem';
+import { DocumentationTreeProvider } from '../apps/documentation/DocumentationTreeProvider';
 import { StatusBarManager } from './ui/StatusBarManager';
 import { TestRunnerConfig } from './types';
-import { TestRunnerTreeProvider } from './testRunner/TestRunnerTreeProvider';
-import { TestRunnerTreeItem } from './testRunner/TestRunnerTreeItem';
-import { TestRunnerCodeLensProvider } from './testRunner/TestRunnerCodeLensProvider';
-import { DiscoveredTest, TestRunnerManager } from './testRunner/TestRunnerManager';
+import { TestRunnerTreeProvider } from '../apps/testRunner/TestRunnerTreeProvider';
+import { TestRunnerTreeItem } from '../apps/testRunner/TestRunnerTreeItem';
+import { TestRunnerCodeLensProvider } from '../apps/testRunner/TestRunnerCodeLensProvider';
+import { DiscoveredTest, TestRunnerManager } from '../apps/testRunner/TestRunnerManager';
 
 type DocumentationPosition = 'top' | 'bottom';
 
@@ -35,7 +35,7 @@ async function applyDocumentationViewPosition(position: DocumentationPosition): 
     }
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     console.log('Task and Documentation Hub extension is now active!');
 
     // Initialize managers
@@ -44,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
     const webviewManager = WebviewManager.getInstance();
 
     // Initialize configuration
-    configManager.initialize();
+    await configManager.initialize();
 
     // Create tree provider
     const treeProvider = new CommandTreeProvider();
@@ -66,6 +66,12 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: true
     });
 
+    // Discover tests for configs with autoFind enabled on extension load
+    const configs = testRunnerManager.getConfigs().filter(c => c.activated && c.autoFind !== false);
+    for (const config of configs) {
+        await testRunnerManager.discoverAndCacheTests(config, testRunnerProvider);
+    }
+
     const codeLensProvider = new TestRunnerCodeLensProvider(testRunnerManager);
     const codeLensSelectors: vscode.DocumentSelector = [
         { language: 'javascript', scheme: 'file' },
@@ -80,6 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
     commandExecutor.setTreeProvider(treeProvider);
     commandExecutor.setWebviewManager(webviewManager);
     webviewManager.setTreeProvider(treeProvider);
+    webviewManager.setTestRunnerTreeProvider(testRunnerProvider);
 
     const statusBarManager = new StatusBarManager(context, treeProvider, configManager);
     context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView, testRunnerProvider, testRunnerTreeView, codeLensProvider, codeLensRegistration);
@@ -545,7 +552,12 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     const runAllTestsCommand = vscode.commands.registerCommand('testRunner.runAll', async () => {
-        await testRunnerManager.runAll();
+        await testRunnerManager.runAll(undefined, testRunnerProvider);
+    });
+
+    const stopAllTestsCommand = vscode.commands.registerCommand('testRunner.stopAll', () => {
+        testRunnerManager.cancelRunAll();
+        vscode.window.showInformationMessage('Stopping all tests...');
     });
 
     const runConfigurationCommand = vscode.commands.registerCommand(
@@ -554,7 +566,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (!item || !item.isConfig()) {
                 return;
             }
-            await testRunnerManager.runAll(item.config);
+            await testRunnerManager.runAll(item.config, testRunnerProvider);
         }
     );
 
@@ -569,11 +581,30 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No tests found in this folder.');
                 return;
             }
-            for (const test of tests) {
-                await testRunnerManager.runTest(item.config, test.label, {
-                    file: test.file.fsPath,
-                    line: String(test.line + 1)
-                });
+            
+            // Set all tests and parent to running
+            testRunnerProvider.setTestsStatus(tests, 'running');
+            testRunnerProvider.setParentStatus(item.config.id, 'folder', item.folderPath, 'running');
+            // Refresh the config to ensure all children (folders, files, testcases, and tests) are recreated
+            const configItem = new TestRunnerTreeItem('config', item.config);
+            testRunnerProvider.refresh();
+            
+            try {
+                // Use resolver to run all tests in folder with a single command
+                const passed = await testRunnerManager.runTestsInPathWithResult(item.config, tests, 'folder', item.folderPath);
+                
+                // Update all tests and parent to passed/failed
+                testRunnerProvider.setTestsStatus(tests, passed ? 'passed' : 'failed');
+                testRunnerProvider.setParentStatus(item.config.id, 'folder', item.folderPath, passed ? 'passed' : 'failed');
+                // Refresh the config to ensure all children are recreated with updated statuses
+                testRunnerProvider.refresh();
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Test execution failed: ${errorMessage}`);
+                testRunnerProvider.setTestsStatus(tests, 'failed');
+                testRunnerProvider.setParentStatus(item.config.id, 'folder', item.folderPath, 'failed');
+                // Refresh the config to ensure all children are recreated with updated statuses
+                testRunnerProvider.refresh();
             }
         }
     );
@@ -589,11 +620,31 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No tests found in this file.');
                 return;
             }
-            for (const test of tests) {
-                await testRunnerManager.runTest(item.config, test.label, {
-                    file: test.file.fsPath,
-                    line: String(test.line + 1)
-                });
+            
+            // Set all tests and parent to running
+            const fileKey = `${item.folderPath}/${item.fileName}`;
+            testRunnerProvider.setTestsStatus(tests, 'running');
+            testRunnerProvider.setParentStatus(item.config.id, 'file', fileKey, 'running');
+            // Refresh the parent folder to ensure all children (files, testcases, and tests) are recreated
+            const parentFolderItem = new TestRunnerTreeItem('folder', item.config, undefined, undefined, item.folderPath);
+            testRunnerProvider.refresh();
+            
+            try {
+                // Use resolver to run all tests in file with a single command
+                const passed = await testRunnerManager.runTestsInPathWithResult(item.config, tests, 'file');
+                
+                // Update all tests and parent to passed/failed
+                testRunnerProvider.setTestsStatus(tests, passed ? 'passed' : 'failed');
+                testRunnerProvider.setParentStatus(item.config.id, 'file', fileKey, passed ? 'passed' : 'failed');
+                // Refresh the parent folder to ensure all children are recreated with updated statuses
+                testRunnerProvider.refresh();
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Test execution failed: ${errorMessage}`);
+                testRunnerProvider.setTestsStatus(tests, 'failed');
+                testRunnerProvider.setParentStatus(item.config.id, 'file', fileKey, 'failed');
+                // Refresh the parent folder to ensure all children are recreated with updated statuses
+                testRunnerProvider.refresh();
             }
         }
     );
@@ -609,11 +660,31 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No tests found in this test case.');
                 return;
             }
-            for (const test of tests) {
-                await testRunnerManager.runTest(item.config, test.label, {
-                    file: test.file.fsPath,
-                    line: String(test.line + 1)
-                });
+            
+            // Set all tests and parent to running
+            const testCaseKey = `${item.folderPath}/${item.fileName}/${item.testCaseName}`;
+            testRunnerProvider.setTestsStatus(tests, 'running');
+            testRunnerProvider.setParentStatus(item.config.id, 'testcase', testCaseKey, 'running');
+            // Refresh both the testcase item and its parent file to ensure all children are recreated
+            const parentFileItem = new TestRunnerTreeItem('file', item.config, undefined, undefined, item.folderPath, item.fileName);
+            testRunnerProvider.refresh();
+            
+            try {
+                // Use resolver to run all tests in test case with a single command
+                const passed = await testRunnerManager.runTestsInPathWithResult(item.config, tests, 'testcase', undefined, item.testCaseName);
+                
+                // Update all tests and parent to passed/failed
+                testRunnerProvider.setTestsStatus(tests, passed ? 'passed' : 'failed');
+                testRunnerProvider.setParentStatus(item.config.id, 'testcase', testCaseKey, passed ? 'passed' : 'failed');
+                // Refresh both the testcase item and its parent file to ensure all children are recreated with updated statuses
+                testRunnerProvider.refresh();
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                vscode.window.showErrorMessage(`Test execution failed: ${errorMessage}`);
+                testRunnerProvider.setTestsStatus(tests, 'failed');
+                testRunnerProvider.setParentStatus(item.config.id, 'testcase', testCaseKey, 'failed');
+                // Refresh both the testcase item and its parent file to ensure all children are recreated with updated statuses
+                testRunnerProvider.refresh();
             }
         }
     );
@@ -838,8 +909,14 @@ export function activate(context: vscode.ExtensionContext) {
         }, 50);
     });
 
-    const refreshTestRunners = vscode.commands.registerCommand('testRunner.refresh', () => {
-        // Clear the test cache and refresh the tree view to rediscover tests
+    const refreshTestRunners = vscode.commands.registerCommand('testRunner.refresh', async () => {
+        // Clear all test statuses to reset icons
+        testRunnerProvider.clearAllStatuses();
+        // Discover tests only for configs with AutoFind ON
+        const configs = testRunnerManager.getConfigs().filter(c => c.activated && c.autoFind !== false);
+        for (const config of configs) {
+            await testRunnerManager.discoverAndCacheTests(config, testRunnerProvider);
+        }
         testRunnerProvider.refresh();
     });
 
@@ -848,9 +925,10 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        // Force refresh tests for this configuration
-        testRunnerProvider.refresh(item);
-        vscode.window.showInformationMessage(`Finding tests for "${item.config.title}"...`);
+        // Discover tests and cache them in the tree provider
+        const tests = await testRunnerManager.discoverAndCacheTests(item.config, testRunnerProvider);
+        vscode.window.showInformationMessage(`Found ${tests.length} test(s) for "${item.config.title}". Please Refresh the Test Runner to see the tests in the tree view.`);
+        setTimeout(() => { void vscode.commands.executeCommand('testRunner.refresh'); }, 200);
     });
 
     context.subscriptions.push(
@@ -858,6 +936,7 @@ export function activate(context: vscode.ExtensionContext) {
         openTestRunnerConfiguration,
         runAllTestsCommand,
         runConfigurationCommand,
+        stopAllTestsCommand,
         runFolderCommand,
         runFileCommand,
         runTestCaseCommand,

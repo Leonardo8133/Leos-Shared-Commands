@@ -61,5 +61,525 @@
         }
       ]
     }
+  },
+  {
+    "version": 14,
+    "timestamp": "2025-10-30T02:07:19.235Z",
+    "config": {
+      "folders": [
+        {
+          "name": "Javascript",
+          "icon": "$(library)",
+          "commands": [
+            {
+              "id": "compile",
+              "label": "Compile",
+              "icon": "$(lock)",
+              "command": "npm run compile",
+              "terminal": {
+                "type": "vscode-new",
+                "name": "compile"
+              },
+              "variables": []
+            },
+            {
+              "id": "watch",
+              "label": "Watch",
+              "description": "Compile and watch TypeScript and HTML changes",
+              "icon": "$(watch)",
+              "command": "npm run watch",
+              "terminal": {
+                "type": "vscode-current"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-js-tests",
+              "label": "Run JS Tests",
+              "description": "Run extension unit tests",
+              "icon": "$(beaker)",
+              "command": "npm test",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "JS Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-ui-tests",
+              "label": "Run UI tests",
+              "description": "Run WebdriverIO UI tests",
+              "icon": "$(beaker)",
+              "command": "npm run test:ui",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "UI Tests"
+              },
+              "variables": []
+            }
+          ],
+          "subfolders": []
+        },
+        {
+          "name": "Python",
+          "icon": "$(symbol-method)",
+          "commands": [
+            {
+              "id": "python-unittests",
+              "label": "Run python tests",
+              "description": "Run Python unittests (discover)",
+              "icon": "$(play)",
+              "command": "python -m unittest discover",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Python Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "django-runserver",
+              "label": "Run site",
+              "description": "Run server (prompt for host:port)",
+              "icon": "$(tools)",
+              "command": "python manage.py runserver $input",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Django"
+              },
+              "variables": []
+            }
+          ]
+        }
+      ],
+      "sharedVariables": [
+        {
+          "key": "PROJECT_ROOT",
+          "label": "Project root",
+          "value": "${workspaceFolder}",
+          "description": "Path to the current workspace folder"
+        }
+      ],
+      "sharedLists": [
+        {
+          "key": "ENVIRONMENT_NAME",
+          "label": "Environment",
+          "options": [
+            "local",
+            "staging",
+            "production"
+          ],
+          "description": "Common deployment targets"
+        }
+      ],
+      "version": 14,
+      "lastModified": "2025-10-30T02:07:19.235Z",
+      "testRunners": [
+        {
+          "id": "test-runner-default",
+          "activated": false,
+          "title": "JavaScript Tests",
+          "fileType": "javascript",
+          "workingDirectory": "",
+          "fileNamePattern": "test_*\n*test*\n*.spec.*",
+          "testNamePattern": "*",
+          "ignoreList": "",
+          "runTestCommand": "npm test -- $test_name",
+          "terminalName": "Test Runner",
+          "allowNonTest": false,
+          "autoFind": true,
+          "inlineButton": true
+        }
+      ]
+    }
+  },
+  {
+    "version": 15,
+    "timestamp": "2025-10-31T02:28:51.750Z",
+    "config": {
+      "folders": [
+        {
+          "name": "Javascript",
+          "icon": "$(library)",
+          "commands": [
+            {
+              "id": "compile",
+              "label": "Compile",
+              "icon": "$(lock)",
+              "command": "npm run compile",
+              "terminal": {
+                "type": "vscode-new",
+                "name": "compile"
+              },
+              "variables": []
+            },
+            {
+              "id": "watch",
+              "label": "Watch",
+              "description": "Compile and watch TypeScript and HTML changes",
+              "icon": "$(watch)",
+              "command": "npm run watch",
+              "terminal": {
+                "type": "vscode-current"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-js-tests",
+              "label": "Run JS Tests",
+              "description": "Run extension unit tests",
+              "icon": "$(beaker)",
+              "command": "npm test",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "JS Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-ui-tests",
+              "label": "Run UI tests",
+              "description": "Run WebdriverIO UI tests",
+              "icon": "$(beaker)",
+              "command": "npm run test:ui",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "UI Tests"
+              },
+              "variables": []
+            }
+          ],
+          "subfolders": []
+        },
+        {
+          "name": "Python",
+          "icon": "$(symbol-method)",
+          "commands": [
+            {
+              "id": "python-unittests",
+              "label": "Run python tests",
+              "description": "Run Python unittests (discover)",
+              "icon": "$(play)",
+              "command": "python -m unittest discover",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Python Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "django-runserver",
+              "label": "Run site",
+              "description": "Run server (prompt for host:port)",
+              "icon": "$(tools)",
+              "command": "python manage.py runserver $input",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Django"
+              },
+              "variables": []
+            }
+          ]
+        }
+      ],
+      "sharedVariables": [
+        {
+          "key": "PROJECT_ROOT",
+          "label": "Project root",
+          "value": "${workspaceFolder}",
+          "description": "Path to the current workspace folder"
+        }
+      ],
+      "sharedLists": [
+        {
+          "key": "ENVIRONMENT_NAME",
+          "label": "Environment",
+          "options": [
+            "local",
+            "staging",
+            "production"
+          ],
+          "description": "Common deployment targets"
+        }
+      ],
+      "version": 15,
+      "lastModified": "2025-10-31T02:28:51.750Z",
+      "testRunners": [
+        {
+          "id": "test-runner-default",
+          "activated": true,
+          "title": "JavaScript Tests",
+          "fileType": "javascript",
+          "workingDirectory": "",
+          "fileNamePattern": "test_*\n*test*\n*.spec.*",
+          "testNamePattern": "*",
+          "ignoreList": "",
+          "runTestCommand": "npm test -- $test_name",
+          "terminalName": "Test Runner",
+          "allowNonTest": false,
+          "autoFind": true,
+          "inlineButton": true
+        }
+      ]
+    }
+  },
+  {
+    "version": 16,
+    "timestamp": "2025-10-31T02:29:40.420Z",
+    "config": {
+      "folders": [
+        {
+          "name": "Javascript",
+          "icon": "$(library)",
+          "commands": [
+            {
+              "id": "compile",
+              "label": "Compile",
+              "icon": "$(lock)",
+              "command": "npm run compile",
+              "terminal": {
+                "type": "vscode-new",
+                "name": "compile"
+              },
+              "variables": []
+            },
+            {
+              "id": "watch",
+              "label": "Watch",
+              "description": "Compile and watch TypeScript and HTML changes",
+              "icon": "$(watch)",
+              "command": "npm run watch",
+              "terminal": {
+                "type": "vscode-current"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-js-tests",
+              "label": "Run JS Tests",
+              "description": "Run extension unit tests",
+              "icon": "$(beaker)",
+              "command": "npm test",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "JS Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-ui-tests",
+              "label": "Run UI tests",
+              "description": "Run WebdriverIO UI tests",
+              "icon": "$(beaker)",
+              "command": "npm run test:ui",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "UI Tests"
+              },
+              "variables": []
+            }
+          ],
+          "subfolders": []
+        },
+        {
+          "name": "Python",
+          "icon": "$(symbol-method)",
+          "commands": [
+            {
+              "id": "python-unittests",
+              "label": "Run python tests",
+              "description": "Run Python unittests (discover)",
+              "icon": "$(play)",
+              "command": "python -m unittest discover",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Python Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "django-runserver",
+              "label": "Run site",
+              "description": "Run server (prompt for host:port)",
+              "icon": "$(tools)",
+              "command": "python manage.py runserver $input",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Django"
+              },
+              "variables": []
+            }
+          ]
+        }
+      ],
+      "sharedVariables": [
+        {
+          "key": "PROJECT_ROOT",
+          "label": "Project root",
+          "value": "${workspaceFolder}",
+          "description": "Path to the current workspace folder"
+        }
+      ],
+      "sharedLists": [
+        {
+          "key": "ENVIRONMENT_NAME",
+          "label": "Environment",
+          "options": [
+            "local",
+            "staging",
+            "production"
+          ],
+          "description": "Common deployment targets"
+        }
+      ],
+      "version": 16,
+      "lastModified": "2025-10-31T02:29:40.420Z",
+      "testRunners": [
+        {
+          "id": "test-runner-default",
+          "activated": true,
+          "title": "JavaScript Tests",
+          "fileType": "javascript",
+          "workingDirectory": "",
+          "fileNamePattern": "test_*\n*test*\n*.spec.*",
+          "testNamePattern": "*",
+          "ignoreList": "",
+          "runTestCommand": "npm test -- $test_name",
+          "terminalName": "Test Runner",
+          "allowNonTest": false,
+          "autoFind": false,
+          "inlineButton": true
+        }
+      ]
+    }
+  },
+  {
+    "version": 17,
+    "timestamp": "2025-10-31T02:30:44.140Z",
+    "config": {
+      "folders": [
+        {
+          "name": "Javascript",
+          "icon": "$(library)",
+          "commands": [
+            {
+              "id": "compile",
+              "label": "Compile",
+              "icon": "$(lock)",
+              "command": "npm run compile",
+              "terminal": {
+                "type": "vscode-new",
+                "name": "compile"
+              },
+              "variables": []
+            },
+            {
+              "id": "watch",
+              "label": "Watch",
+              "description": "Compile and watch TypeScript and HTML changes",
+              "icon": "$(watch)",
+              "command": "npm run watch",
+              "terminal": {
+                "type": "vscode-current"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-js-tests",
+              "label": "Run JS Tests",
+              "description": "Run extension unit tests",
+              "icon": "$(beaker)",
+              "command": "npm test",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "JS Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "run-ui-tests",
+              "label": "Run UI tests",
+              "description": "Run WebdriverIO UI tests",
+              "icon": "$(beaker)",
+              "command": "npm run test:ui",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "UI Tests"
+              },
+              "variables": []
+            }
+          ],
+          "subfolders": []
+        },
+        {
+          "name": "Python",
+          "icon": "$(symbol-method)",
+          "commands": [
+            {
+              "id": "python-unittests",
+              "label": "Run python tests",
+              "description": "Run Python unittests (discover)",
+              "icon": "$(play)",
+              "command": "python -m unittest discover",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Python Tests"
+              },
+              "variables": []
+            },
+            {
+              "id": "django-runserver",
+              "label": "Run site",
+              "description": "Run server (prompt for host:port)",
+              "icon": "$(tools)",
+              "command": "python manage.py runserver $input",
+              "terminal": {
+                "type": "vscode-current",
+                "name": "Django"
+              },
+              "variables": []
+            }
+          ]
+        }
+      ],
+      "sharedVariables": [
+        {
+          "key": "PROJECT_ROOT",
+          "label": "Project root",
+          "value": "${workspaceFolder}",
+          "description": "Path to the current workspace folder"
+        }
+      ],
+      "sharedLists": [
+        {
+          "key": "ENVIRONMENT_NAME",
+          "label": "Environment",
+          "options": [
+            "local",
+            "staging",
+            "production"
+          ],
+          "description": "Common deployment targets"
+        }
+      ],
+      "version": 17,
+      "lastModified": "2025-10-31T02:30:44.140Z",
+      "testRunners": [
+        {
+          "id": "test-runner-default",
+          "activated": true,
+          "title": "JavaScript Tests",
+          "fileType": "javascript",
+          "workingDirectory": "",
+          "fileNamePattern": "test_*\n*test*\n*.spec.*",
+          "testNamePattern": "*",
+          "ignoreList": "",
+          "runTestCommand": "npm test -- $test_name",
+          "terminalName": "Test Runner",
+          "allowNonTest": false,
+          "autoFind": true,
+          "inlineButton": true
+        }
+      ]
+    }
   }
 ]

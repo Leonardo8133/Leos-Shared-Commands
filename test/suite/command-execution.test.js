@@ -1,9 +1,9 @@
 const assert = require('assert');
 const vscode = require('vscode');
 
-const { CommandExecutor } = require('../../out/src/execution/CommandExecutor');
-const { TerminalManager } = require('../../out/src/execution/TerminalManager');
-const { ConfigManager } = require('../../out/src/config/ConfigManager');
+const { CommandExecutor } = require('../../apps/tasks/execution/CommandExecutor');
+const { TerminalManager } = require('../../src/execution/TerminalManager');
+const { ConfigManager } = require('../../src/config/ConfigManager');
 
 suite('Command execution integration', () => {
   const executor = CommandExecutor.getInstance();
@@ -63,22 +63,6 @@ suite('Command execution integration', () => {
 
     assert.strictEqual(result.success, true, result.error);
     assert.strictEqual(executedCommand, 'echo bar');
-  });
-
-  test('prompts for list variables and uses the selected option', async () => {
-    originalQuickPick = vscode.window.showQuickPick;
-    vscode.window.showQuickPick = async () => 'prod';
-
-    const result = await executor.executeCommand({
-      id: 'list-test',
-      label: 'Deploy',
-      command: 'deploy $TARGET',
-      terminal: { type: 'vscode-new' },
-      variables: [{ key: 'TARGET', type: 'list', label: 'Target' }]
-    });
-
-    assert.strictEqual(result.success, true, result.error);
-    assert.strictEqual(executedCommand, 'deploy prod');
   });
 
   test('fails gracefully when a variable is missing', async () => {

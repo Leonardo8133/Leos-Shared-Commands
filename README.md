@@ -18,9 +18,18 @@ A productivity-focused VS Code extension that centralizes reusable commands, pro
 
 ### Test Runner
 - **Configurable suites** with file/test patterns, ignore lists, terminal name, and working directory
+- **Pattern-based discovery** with real-time preview widget showing matching files
+- **Path pattern support** - use `/` in file patterns to match specific directories (e.g., `tests/test_*`)
+- **Language-specific ignore lists** - automatically excludes common directories (`node_modules`, `out`, `__pycache__`, etc.)
+- **Parallel execution** - Run All executes up to 6 tests concurrently for faster test runs
+- **Optimized batch execution** - Run Folder/File/TestCase uses language-specific resolvers for single-command execution
+- **Parent status icons** - folders/files/testcases show pass/error icons based on child test results
+- **Test count display** - shows "X tests found" for folders, files, testcases, and configurations
+- **Auto Find control** - when OFF, tests only discovered on manual "Find Tests" click
 - **Inline actions** to run or ignore discovered tests directly from the tree view
 - **Code lenses** that add a green run button next to each matched test inside the editor
-- **Batch execution** to run every discovered test through the configured command (`$test` placeholder supported)
+- **Batch execution** with confirmation dialog showing test count breakdown
+- **Stop All button** - cancel running tests from sidebar
 
 ### Terminal Options
 - Integrated VS Code terminals, external CMD, or PowerShell
@@ -60,10 +69,14 @@ A productivity-focused VS Code extension that centralizes reusable commands, pro
    - Activation toggle and display title
    - File type (JavaScript, TypeScript, Python)
    - Optional working directory and terminal name
-   - File patterns, test name patterns, and ignore list (`*` works as a wildcard)
-   - The command to execute (`$test` is replaced with the selected test)
+   - File patterns (supports path patterns like `tests/test_*` - see real-time preview widget)
+   - Test name patterns and ignore list (`*` works as a wildcard)
+   - The command to execute (`$test`, `$test_file`, `$executable_test_path` placeholders supported)
+   - Auto Find toggle (when OFF, tests only discovered on manual "Find Tests" click)
 4. Save to persist inside `.vscode/commands.json`
-5. Expand a configuration to discover tests and run/ignore them, or click **Run all** from the view title
+5. Expand a configuration to discover tests and run/ignore them
+6. Use **Run All** from sidebar (with confirmation) or **Stop** to cancel running tests
+7. Parent items (folders/files/testcases) show pass/error icons based on child test results
 
 ## 🔧 Configuration
 
@@ -77,6 +90,20 @@ Use the configuration webview to manage shared variables and lists that commands
 ### Test Runner Settings
 - Multiple configurations supported inside `.vscode/commands.json`
 - Per configuration fields match those shown in the configuration webview
+- **Pattern Features:**
+  - Path patterns: Use `/` to match files in specific directories (e.g., `tests/test_*`)
+  - Extension-agnostic: Patterns ignore file extensions (e.g., `test_*` matches `.py`, `.js`, `.ts`)
+  - Parent directory matching: `tests*/*` matches any folder starting with `tests`
+  - Real-time preview widget shows matching file count and first 10 files
+- **Execution Features:**
+  - Parallel execution: Run All executes up to 6 tests concurrently
+  - Optimized batch execution: Run Folder/File/TestCase uses resolvers for single-command execution
+  - Single terminal: Run All uses shared terminal panel
+  - Confirmation dialog: Shows test count breakdown before execution
+- **Status Icons:**
+  - Parent items (folders/files/testcases) show pass icon if all child tests passed
+  - Parent items show error icon if any child test failed
+  - Test counts displayed as "X tests found" format
 
 ## 📋 Usage Examples
 

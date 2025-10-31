@@ -1,0 +1,327 @@
+﻿
+> command-manager@1.1.0 pretest
+> npm run compile
+
+
+> command-manager@1.1.0 compile
+> node scripts/compile.js
+
+Compiling TypeScript...
+Copying test files...
+Copying resources...
+Compilation complete!
+
+> command-manager@1.1.0 test
+> node ./out/test/runTest.js
+
+node.exe : - Resolving version...
+No C:\Program Files\nodejs\npm.ps1:29 caractere:3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (- Resolving version...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ÔêÜ Validated version: 1.105.1
+ÔêÜ Found existing install in 
+C:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\.vscode-test\vscode-win32-x64-archive-1.105.1
+
+[main 2025-10-31T03:06:20.482Z] update#setState disabled
+[main 2025-10-31T03:06:20.482Z] update#ctor - updates are disabled by the environment
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Started local extension host with pid 20384.
+Unable to read file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\apps\package.json' (Error: Unable to 
+resolve nonexistent file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\apps\package.json')
+Unable to read file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\resources\package.json' (Error: Unable 
+to resolve nonexistent file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\resources\package.json')
+Unable to read file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\src\package.json' (Error: Unable to 
+resolve nonexistent file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\src\package.json')
+Unable to read file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\package.json' (Error: Unable to 
+resolve nonexistent file 'c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\package.json')
+MCP Registry configured: https://api.mcp.github.com/2025-09-15
+Settings Sync: Account status changed from uninitialized to unavailable
+[0m[0m
+[0m  Tree move operations[0m
+  [31m  1) reorders commands within the same folder[0m
+  [32m  ÔêÜ[0m[90m moves command into a different folder[0m
+  [32m  ÔêÜ[0m[90m moves a folder into another folder[0m
+  [32m  ÔêÜ[0m[90m prevents moving a folder into its descendant[0m
+[0m  Test execution resolvers[0m
+  [32m  ÔêÜ[0m[90m Resolver module loads correctly - catches import errors[0m
+  [31m  2) Python resolver - resolveFilePath extracts module path[0m
+  [32m  ÔêÜ[0m[90m Python resolver - resolveFolderPath extracts folder module path[0m
+  [31m  3) Python resolver - resolveTestCasePath includes test case name[0m
+  [31m  4) Python resolver - works with working directory[0m
+  [32m  ÔêÜ[0m[90m JavaScript resolver - resolveFilePath returns file path[0m
+  [32m  ÔêÜ[0m[90m JavaScript resolver - resolveFolderPath returns folder path[0m
+  [32m  ÔêÜ[0m[90m TypeScript resolver - resolveFilePath returns file path[0m
+  [31m  5) Python resolver - extracts correct path from executable_test_path format[0m
+  [32m  ÔêÜ[0m[90m Resolvers handle empty test arrays[0m
+[0m  Test runner persistence[0m
+  [32m  ÔêÜ[0m[90m disabled configuration persists after save and reload[0m
+  [32m  ÔêÜ[0m[90m enabled configuration persists after save and reload[0m
+  [32m  ÔêÜ[0m[90m toggle activation persists state[0m[33m (54ms)[0m
+[0m  Test runner discovery[0m
+  [31m  6) path-based pattern matches files in specific path[0m
+  [31m  7) basename-only pattern still works[0m
+  [32m  ÔêÜ[0m[90m JavaScript ignores node_modules and out directories[0m
+  [32m  ÔêÜ[0m[90m Python ignores __pycache__ and .venv directories[0m
+  [32m  ÔêÜ[0m[90m recursive path pattern works[0m
+[0m  Terminal disposal integration[0m
+  [31m  8) disposes existing terminal before creating new one with same name[0m
+  [31m  9) handles multiple terminals with different names[0m
+[0m  Tasks move operations integration[0m
+  [32m  ÔêÜ[0m[90m moveItemUp moves command up within same folder[0m
+  [31m  10) moveItemDown moves command down within same folder[0m
+  [32m  ÔêÜ[0m[90m moveItemUp does not move first command beyond beginning[0m
+  [32m  ÔêÜ[0m[90m moveItemDown does not move last command beyond end[0m
+  [32m  ÔêÜ[0m[90m moveItemUp moves folder up[0m
+  [31m  11) moveItemDown moves folder down[0m
+  [32m  ÔêÜ[0m[90m moveItemToFolder moves command to different folder[0m
+  [32m  ÔêÜ[0m[90m moveItemToFolder moves folder into another folder[0m
+  [32m  ÔêÜ[0m[90m moveItemToFolder prevents moving folder into itself[0m
+[0m  Command execution integration[0m
+  [31m  12) resolves fixed variables without prompts[0m
+  [31m  13) prompts for list variables and uses the selected option[0m
+  [31m  14) fails gracefully when a variable is missing[0m
+[92m [0m[32m 22 passing[0m[90m (574ms)[0m
+[31m  14 failing[0m
+[0m  1) Tree move operations
+       reorders commands within the same folder:
+
+      [31mAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'cmd-2',
++   'cmd-1',
+    'cmd-3',
+-   'cmd-1'
+  ]
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+       [
+         "cmd-2"
+      [32m+  "cmd-3"[0m
+         "cmd-1"
+      [31m-  "cmd-3"[0m
+       ]
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\tree-move.test.js:48:12)
+  	at process.processImmediate (node:internal/timers:485:21)
+[0m
+[0m  2) Test execution resolvers
+       Python resolver - resolveFilePath extracts module path:
+
+      [31mAssertionError [ERR_ASSERTION]: Should return module path without test details
++ actual - expected
+
++ ''
+- 'flowchart.tests.test_file'
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [32m+flowchart.tests.test_file[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\testrunner-resolvers.test.js:56:12)
+  	at process.processImmediate (node:internal/timers:485:21)
+[0m
+[0m  3) Test execution resolvers
+       Python resolver - resolveTestCasePath includes test case name:
+
+      [31mAssertionError [ERR_ASSERTION]: Should include test case name
++ actual - expected
+
++ '.TestCase'
+- 'flowchart.tests.test_file.TestCase'
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-.TestCase[0m
+      [32m+flowchart.tests.test_file.TestCase[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\testrunner-resolvers.test.js:78:12)
+  	at process.processImmediate (node:internal/timers:485:21)
+[0m
+[0m  4) Test execution resolvers
+       Python resolver - works with working directory:
+
+      [31mAssertionError [ERR_ASSERTION]: Should respect working directory
++ actual - expected
+
++ ''
+- 'flowchart.tests.test_file'
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [32m+flowchart.tests.test_file[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\testrunner-resolvers.test.js:88:12)
+  	at process.processImmediate (node:internal/timers:485:21)
+[0m
+[0m  5) Test execution resolvers
+       Python resolver - extracts correct path from executable_test_path format:
+
+      [31mAssertionError [ERR_ASSERTION]: Should extract file path only
++ actual - expected
+
++ ''
+- 'flowchart.tests.test_file'
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [32m+flowchart.tests.test_file[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\testrunner-resolvers.test.js:133:12)
+  	at process.processImmediate (node:internal/timers:485:21)
+[0m
+[0m  6) Test runner discovery
+       path-based pattern matches files in specific path:
+
+      [31mAssertionError [ERR_ASSERTION]: Should find test_file1[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-false[0m
+      [32m+true[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\testrunner-discovery.test.js:87:5)
+[0m
+[0m  7) Test runner discovery
+       basename-only pattern still works:
+
+      [31mAssertionError [ERR_ASSERTION]: Should find test_file1[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-false[0m
+      [32m+true[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\testrunner-discovery.test.js:107:5)
+[0m
+[0m  8) Terminal disposal integration
+       disposes existing terminal before creating new one with same name:
+
+      [31mAssertionError [ERR_ASSERTION]: First terminal should exist[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-false[0m
+      [32m+true[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\tasks-terminal.test.js:49:5)
+[0m
+[0m  9) Terminal disposal integration
+       handles multiple terminals with different names:
+
+      [31mAssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert(terminalManager.getTerminal('Terminal A') !== undefined)
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-false[0m
+      [32m+true[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\tasks-terminal.test.js:83:5)
+[0m
+[0m  10) Tasks move operations integration
+       moveItemDown moves command down within same folder:
+
+      [31mAssertionError [ERR_ASSERTION]: Command 2 should be moved after Command 3
++ actual - expected
+
+  [
+    'cmd-1',
++   'cmd-2',
+    'cmd-3',
+-   'cmd-2'
+  ]
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+       [
+         "cmd-1"
+      [32m+  "cmd-3"[0m
+         "cmd-2"
+      [31m-  "cmd-3"[0m
+       ]
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\tasks-move.test.js:96:12)
+[0m
+[0m  11) Tasks move operations integration
+       moveItemDown moves folder down:
+
+      [31mAssertionError [ERR_ASSERTION]: Folder B should be first
++ actual - expected
+
++ 'Folder A'
+- 'Folder B'
+          ^
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-Folder A[0m
+      [32m+Folder B[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\tasks-move.test.js:159:12)
+[0m
+[0m  12) Command execution integration
+       resolves fixed variables without prompts:
+
+      [31mAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'echo undefined'
+- 'echo bar'
+        ^
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-echo undefined[0m
+      [32m+echo bar[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\command-execution.test.js:65:12)
+[0m
+[0m  13) Command execution integration
+       prompts for list variables and uses the selected option:
+
+      [31mAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'deploy $TARGET'
+- 'deploy prod'
+          ^
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-deploy $TARGET[0m
+      [32m+deploy prod[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\command-execution.test.js:81:12)
+[0m
+[0m  14) Command execution integration
+       fails gracefully when a variable is missing:
+
+      [31mAssertionError [ERR_ASSERTION]: Command should fail when variable is missing
+
+true !== false
+[0m
+      [32m+ expected[0m [31m- actual[0m
+
+      [31m-true[0m
+      [32m+false[0m
+      [0m[90m
+  	at Context.<anonymous> (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\command-execution.test.js:93:12)
+[0m
+Error: 14 tests failed.
+	at c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\out\test\suite\index.js:17:18
+	at done (c:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\node_modules\mocha\lib\mocha.js:1028:7)
+[main 2025-10-31T03:06:23.086Z] Extension host with pid 20384 exited with code: 0, signal: unknown.
+Exit code:   1
+Failed to run tests
+TestRunFailedError: Test run failed with code 1
+    at ChildProcess.onProcessClosed 
+(C:\Users\Arthu\Documents\GitHub\Leos-Shared-Commands\node_modules\@vscode\test-electron\out\runTest.js:110:24)
+    at ChildProcess.emit (node:events:518:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:293:12) {
+  code: 1,
+  signal: undefined
+}

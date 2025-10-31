@@ -3,12 +3,12 @@ const assert = require('assert');
 const {
   moveCommandInConfig,
   moveFolderInConfig
-} = require('../../out/src/treeView/moveOperations');
+} = require('../../apps/tasks/treeView/moveOperations');
 
-describe('Tree move operations', () => {
+suite('Tree move operations', () => {
   let config;
 
-  beforeEach(() => {
+  setup(() => {
     config = {
       folders: [
         {
@@ -37,7 +37,7 @@ describe('Tree move operations', () => {
     };
   });
 
-  it('reorders commands within the same folder', () => {
+  test('reorders commands within the same folder', () => {
     const moved = moveCommandInConfig(
       config,
       { path: [0], commandId: 'cmd-1' },
@@ -48,7 +48,7 @@ describe('Tree move operations', () => {
     assert.deepStrictEqual(config.folders[0].commands.map(c => c.id), ['cmd-2', 'cmd-3', 'cmd-1']);
   });
 
-  it('moves command into a different folder', () => {
+  test('moves command into a different folder', () => {
     const moved = moveCommandInConfig(
       config,
       { path: [0], commandId: 'cmd-3' },
@@ -60,7 +60,7 @@ describe('Tree move operations', () => {
     assert.deepStrictEqual(config.folders[1].commands.map(c => c.id), ['cmd-4', 'cmd-3']);
   });
 
-  it('moves a folder into another folder', () => {
+  test('moves a folder into another folder', () => {
     const moved = moveFolderInConfig(
       config,
       { path: [0, 0] },
@@ -73,7 +73,7 @@ describe('Tree move operations', () => {
     assert.strictEqual(config.folders[1].subfolders[0].name, 'Subfolder A1');
   });
 
-  it('prevents moving a folder into its descendant', () => {
+  test('prevents moving a folder into its descendant', () => {
     // Prepare nested structure: move folder B under folder A first
     moveFolderInConfig(config, { path: [1] }, { parentPath: [0], position: 'into' });
 

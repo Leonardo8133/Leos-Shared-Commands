@@ -104,8 +104,8 @@
       "description": "Common deployment targets"
     }
   ],
-  "version": 14,
-  "lastModified": "2025-10-30T02:07:19.235Z",
+  "version": 18,
+  "lastModified": "2025-10-31T02:38:04.257Z",
   "testRunners": [
     {
       "id": "test-runner-default",

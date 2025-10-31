@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { Command, Folder } from '../types';
-import { CommandTreeProvider } from '../treeView/CommandTreeProvider';
+import { CommandTreeProvider } from '../../apps/tasks/treeView/CommandTreeProvider';
 import { ConfigManager } from '../config/ConfigManager';
 
 export class StatusBarManager implements vscode.Disposable {

@@ -336,10 +336,19 @@
       </div>
     </div>
     <div class="grid">
-      <div>
+      <div style="position: relative;">
         <label for="filePattern">File name pattern</label>
         <textarea id="filePattern" placeholder="test_*&#10;*tests*"></textarea>
-        <div class="help-text">One pattern per line. Use * as wildcard.</div>
+        <div class="help-text">One pattern per line. Use * as wildcard.<br/> Include file ext (.py, .js ...)
+          <br/> Example: tests*/test_*.py, general_tests/*tests*.js
+        </div>
+        <div id="patternPreview" style="position: absolute; top: 0; right: -340px; width: 320px; border: 1px solid var(--vscode-widget-border); border-radius: 4px; padding: 12px; background: var(--vscode-editorWidget-background); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); max-height: 400px; overflow-y: auto; z-index: 1000; display: none;">
+          <div style="font-weight: 600; margin-bottom: 8px; color: var(--vscode-foreground);">Pattern Preview</div>
+          <div id="patternPreviewCount" style="margin-bottom: 8px; color: var(--vscode-descriptionForeground); font-size: 0.9em;"></div>
+          <div id="patternPreviewFiles" style="font-family: var(--vscode-editor-font-family); font-size: 0.85em; color: var(--vscode-foreground);">
+            <div style="color: var(--vscode-descriptionForeground); font-style: italic;">Type a pattern to see matching files...</div>
+          </div>
+        </div>
       </div>
       <div>
         <label for="testPattern">Test name pattern</label>
@@ -392,7 +401,6 @@
       <div class="variable-hint" id="variableHint"></div>
     </div>
     <div class="actions">
-      <button id="runAll" type="button" class="secondary">Run all</button>
       <button id="delete" type="button" class="danger">Delete</button>
       <button id="save" type="button" class="primary">Save</button>
     </div>
@@ -421,7 +429,6 @@
         testPattern: document.getElementById('testPattern'),
         ignoreList: document.getElementById('ignoreList'),
         command: document.getElementById('command'),
-        runAll: document.getElementById('runAll'),
         deleteButton: document.getElementById('delete'),
         save: document.getElementById('save'),
         testList: document.getElementById('testList'),
@@ -434,6 +441,9 @@
         templateLanguage: document.getElementById('templateLanguage'),
         templateName: document.getElementById('templateName'),
         loadTemplate: document.getElementById('loadTemplate'),
+        patternPreview: document.getElementById('patternPreview'),
+        patternPreviewCount: document.getElementById('patternPreviewCount'),
+        patternPreviewFiles: document.getElementById('patternPreviewFiles'),
         allowNonTestLabel: document.getElementById('allowNonTestLabel'),
         autoFindLabel: document.getElementById('autoFindLabel'),
         inlineButtonLabel: document.getElementById('inlineButtonLabel'),
@@ -476,6 +486,8 @@
         
         // Check for variables in command
         checkVariablesInCommand(elements.command.value);
+        
+        // Don't trigger preview on load - only show when user focuses the field
       }
 
       function collectConfig() {
@@ -528,6 +540,167 @@
       // Add event listener for command input
       elements.command.addEventListener('input', (e) => {
         checkVariablesInCommand(e.target.value);
+      });
+
+      // Pattern preview functionality
+      let patternPreviewTimeout = null;
+      let lastPreviewPattern = '';
+      
+      function updatePatternPreview(pattern, fileType, workingDirectory) {
+        // Clear previous timeout
+        if (patternPreviewTimeout) {
+          clearTimeout(patternPreviewTimeout);
+          patternPreviewTimeout = null;
+        }
+
+        const trimmedPattern = pattern.trim();
+        
+        // Make preview visible immediately when called
+        if (trimmedPattern.length > 0 && fileType) {
+          // Show loading state
+          elements.patternPreview.style.display = 'block';
+          elements.patternPreviewCount.textContent = 'Loading...';
+          elements.patternPreviewFiles.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">Checking files...</div>';
+        }
+
+        // Debounce: wait 1 second after last change
+        patternPreviewTimeout = setTimeout(() => {
+          // Only request preview if pattern changed and is not empty
+          if (trimmedPattern !== lastPreviewPattern) {
+            lastPreviewPattern = trimmedPattern;
+            
+            if (trimmedPattern.length > 0 && fileType) {
+              vscode.postMessage({
+                type: 'previewPattern',
+                pattern: trimmedPattern,
+                fileType: fileType,
+                workingDirectory: workingDirectory || ''
+              });
+            } else {
+              // Clear preview if pattern is empty
+              elements.patternPreview.style.display = 'none';
+              elements.patternPreviewFiles.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">Type a pattern to see matching files...</div>';
+            }
+          } else if (trimmedPattern.length > 0 && fileType && elements.patternPreview.style.display === 'block') {
+            // Pattern hasn't changed but preview is visible - request update anyway to refresh
+            lastPreviewPattern = ''; // Reset to force update
+            vscode.postMessage({
+              type: 'previewPattern',
+              pattern: trimmedPattern,
+              fileType: fileType,
+              workingDirectory: workingDirectory || ''
+            });
+          }
+          patternPreviewTimeout = null;
+        }, 1000);
+      }
+
+      function displayPatternPreview(count, files) {
+        if (files === undefined) {
+          // Error or no data
+          elements.patternPreview.style.display = 'none';
+          return;
+        }
+
+        elements.patternPreview.style.display = 'block';
+        elements.patternPreviewCount.textContent = `${count} file(s) match the pattern`;
+        
+        if (files.length === 0) {
+          elements.patternPreviewFiles.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">No files match this pattern</div>';
+        } else {
+          const filesList = files.slice(0, 10).map(file => {
+            return `<div style="padding: 4px 0; border-bottom: 1px solid var(--vscode-input-border);">${escapeHtml(file)}</div>`;
+          }).join('');
+          
+          const moreText = count > 10 ? `<div style="padding: 4px 0; color: var(--vscode-descriptionForeground); font-style: italic;">... and ${count - 10} more</div>` : '';
+          
+          elements.patternPreviewFiles.innerHTML = filesList + moreText;
+        }
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // Show/hide preview based on focus
+      elements.filePattern.addEventListener('focus', () => {
+        const pattern = elements.filePattern.value.trim();
+        if (pattern.length > 0) {
+          // Reset the last preview pattern to force update
+          lastPreviewPattern = '';
+          const currentConfig = collectConfig();
+          // Clear any pending timeout and show preview immediately
+          if (patternPreviewTimeout) {
+            clearTimeout(patternPreviewTimeout);
+            patternPreviewTimeout = null;
+          }
+          updatePatternPreview(
+            pattern,
+            currentConfig.fileType,
+            currentConfig.workingDirectory
+          );
+        } else {
+          // Show placeholder even if pattern is empty
+          elements.patternPreview.style.display = 'block';
+          elements.patternPreviewCount.textContent = '';
+          elements.patternPreviewFiles.innerHTML = '<div style="color: var(--vscode-descriptionForeground); font-style: italic;">Type a pattern to see matching files...</div>';
+        }
+      });
+
+      elements.filePattern.addEventListener('blur', () => {
+        // Hide preview when field loses focus
+        elements.patternPreview.style.display = 'none';
+      });
+
+      // Add event listener for file pattern changes
+      elements.filePattern.addEventListener('input', () => {
+        // Only update preview if field is focused
+        if (document.activeElement === elements.filePattern) {
+          const currentConfig = collectConfig();
+          updatePatternPreview(
+            elements.filePattern.value,
+            currentConfig.fileType,
+            currentConfig.workingDirectory
+          );
+        }
+      });
+
+      // Hide preview when other fields get focus
+      const hidePreviewOnOtherFocus = () => {
+        elements.patternPreview.style.display = 'none';
+      };
+
+      elements.title.addEventListener('focus', hidePreviewOnOtherFocus);
+      elements.fileType.addEventListener('focus', hidePreviewOnOtherFocus);
+      elements.workingDirectory.addEventListener('focus', hidePreviewOnOtherFocus);
+      elements.terminalName.addEventListener('focus', hidePreviewOnOtherFocus);
+      elements.testPattern.addEventListener('focus', hidePreviewOnOtherFocus);
+      elements.ignoreList.addEventListener('focus', hidePreviewOnOtherFocus);
+      elements.command.addEventListener('focus', hidePreviewOnOtherFocus);
+
+      // Also trigger preview when file type or working directory changes (but only if pattern field is focused)
+      elements.fileType.addEventListener('change', () => {
+        if (document.activeElement === elements.filePattern && elements.filePattern.value.trim().length > 0) {
+          const currentConfig = collectConfig();
+          updatePatternPreview(
+            elements.filePattern.value,
+            currentConfig.fileType,
+            currentConfig.workingDirectory
+          );
+        }
+      });
+
+      elements.workingDirectory.addEventListener('input', () => {
+        if (document.activeElement === elements.filePattern && elements.filePattern.value.trim().length > 0) {
+          const currentConfig = collectConfig();
+          updatePatternPreview(
+            elements.filePattern.value,
+            currentConfig.fileType,
+            currentConfig.workingDirectory
+          );
+        }
       });
 
       // Templates
@@ -845,6 +1018,8 @@
           }
         } else if (message.type === 'testsDiscovered') {
           displayTests(message.tests);
+        } else if (message.type === 'patternPreview') {
+          displayPatternPreview(message.count || 0, message.files || []);
         }
       });
 
@@ -1001,6 +1176,9 @@
         });
       });
 
+      // Save then find tests (without discovery on plain save to avoid loops)
+      // Removed Find Tests and Stop buttons from edit page
+
       elements.deleteButton.addEventListener('click', () => {
         if (!state.isExisting) {
           // For new configs, just close the editor
@@ -1014,9 +1192,7 @@
         }
       });
 
-      elements.runAll.addEventListener('click', () => {
-        vscode.postMessage({ type: 'runAllTests', id: state.id });
-      });
+      // Removed Run all from edit page
 
       vscode.postMessage({ type: 'ready' });
     </script>

@@ -3,9 +3,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Command, CommandConfig, Folder, TestRunnerConfig } from '../../types';
 import { ConfigManager } from '../../config/ConfigManager';
-import { CommandTreeProvider } from '../../treeView/CommandTreeProvider';
+import { CommandTreeProvider } from '../../../apps/tasks/treeView/CommandTreeProvider';
 import { VariableResolver } from '../../variables/VariableResolver';
-import { TestRunnerManager } from '../../testRunner/TestRunnerManager';
+import { TestRunnerManager } from '../../../apps/testRunner/TestRunnerManager';
+import { TestRunnerTreeProvider } from '../../../apps/testRunner/TestRunnerTreeProvider';
 
 interface CommandEditorContext {
   folderPath?: number[];
@@ -28,6 +29,7 @@ export class WebviewManager {
   private readonly configManager = ConfigManager.getInstance();
   private readonly variableResolver = VariableResolver.getInstance();
   private readonly testRunnerManager = TestRunnerManager.getInstance();
+  private testRunnerTreeProvider?: { cacheTests: (configId: string, tests: any[]) => void; setTestsStatus?: (tests: any[], status: 'idle' | 'running' | 'passed' | 'failed') => void; refresh?: (item?: any) => void };
   private treeProvider?: CommandTreeProvider;
 
   private constructor() {}
@@ -41,6 +43,10 @@ export class WebviewManager {
 
   public setTreeProvider(provider: CommandTreeProvider): void {
     this.treeProvider = provider;
+  }
+
+  public setTestRunnerTreeProvider(provider: { cacheTests: (configId: string, tests: any[]) => void; setTestsStatus?: (tests: any[], status: 'idle' | 'running' | 'passed' | 'failed') => void; refresh?: (item?: any) => void }): void {
+    this.testRunnerTreeProvider = provider;
   }
 
   public showCommandEditor(command?: Command, context?: CommandEditorContext): void {
@@ -261,38 +267,10 @@ export class WebviewManager {
             
             await this.testRunnerManager.saveConfig(sanitized);
             console.log('[WebviewManager] Config saved successfully');
-            
-            console.log('[WebviewManager] Starting test discovery...');
-            
-            // Discover tests after saving
-            let tests: any[] = [];
-            try {
-              console.log('[WebviewManager] Calling discoverTests...');
-              tests = await this.testRunnerManager.discoverTests(sanitized);
-              console.log('[WebviewManager] Test discovery completed:', {
-                count: tests.length,
-                tests: tests.map(t => ({ label: t.label, file: t.file.fsPath }))
-              });
-            } catch (discoverError) {
-              console.error('[WebviewManager] ERROR during test discovery:', discoverError);
-              console.error('[WebviewManager] Error stack:', discoverError instanceof Error ? discoverError.stack : 'No stack');
-              vscode.window.showErrorMessage(`Test discovery failed: ${discoverError instanceof Error ? discoverError.message : String(discoverError)}`);
-            }
-            
-            const testsForDisplay = tests.map(test => ({
-              label: test.label,
-              file: test.file.fsPath,
-              filePath: path.relative(
-                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '',
-                test.file.fsPath
-              ),
-              line: test.line
-            }));
-            
-            console.log('[WebviewManager] Sending test results to webview:', { count: testsForDisplay.length });
-            this.sendTestRunnerState(sanitized, true, testsForDisplay);
+            // Do NOT trigger discovery on save to avoid loops; just update editor state
+            this.sendTestRunnerState(sanitized, true);
             console.log('[WebviewManager] ========== SAVE TEST RUNNER END ==========');
-            vscode.window.showInformationMessage(`Saved test runner "${sanitized.title}". Found ${tests.length} test(s).`);
+            vscode.window.showInformationMessage(`Saved test runner "${sanitized.title}".`);
           } catch (error) {
             const messageText = error instanceof Error ? error.message : String(error);
             console.error('[WebviewManager] ERROR saving test runner:', error);
@@ -347,7 +325,7 @@ export class WebviewManager {
             const currentId = typeof message.id === 'string' ? message.id : initialConfig.id;
             const runner = this.testRunnerManager.getConfigById(currentId);
             if (runner) {
-              await this.testRunnerManager.runAll(runner);
+              await this.testRunnerManager.runAll(runner, this.testRunnerTreeProvider as any);
             } else {
               vscode.window.showWarningMessage('Please save the test runner before running tests.');
             }
@@ -355,6 +333,12 @@ export class WebviewManager {
             const messageText = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to run tests: ${messageText}`);
           }
+          break;
+        case 'stopAllTests':
+          try {
+            this.testRunnerManager.cancelRunAll();
+            vscode.window.showInformationMessage('Stopping all tests...');
+          } catch {}
           break;
         case 'requestRefresh':
           {
@@ -373,6 +357,85 @@ export class WebviewManager {
         case 'showInfo':
           if (typeof message.message === 'string') {
             vscode.window.showInformationMessage(message.message);
+          }
+          break;
+        case 'saveAndFindTests':
+          try {
+            const sanitized = this.sanitizeTestRunnerInput(message.config);
+            await this.testRunnerManager.saveConfig(sanitized);
+            const tests = await this.testRunnerManager.discoverAndCacheTests(sanitized, this.testRunnerTreeProvider);
+            // Only trigger refresh after tests were actually found
+            
+            const testsForDisplay = tests.map(test => ({
+              label: test.label,
+              file: test.file.fsPath,
+              filePath: path.relative(
+                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '',
+                test.file.fsPath
+              ),
+              line: test.line
+            }));
+            this.sendTestRunnerState(sanitized, true, testsForDisplay);
+            vscode.window.showInformationMessage(`Found ${tests.length} test(s) for "${sanitized.title}".`);
+            setTimeout(() => { void vscode.commands.executeCommand('testRunner.refresh'); }, 5000);
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to save and find tests: ${messageText}`);
+          }
+          break;
+        case 'previewPattern':
+          {
+            try {
+              const pattern = typeof message.pattern === 'string' ? message.pattern : '';
+              const fileType = typeof message.fileType === 'string' ? message.fileType : 'javascript';
+              const workingDirectory = typeof message.workingDirectory === 'string' ? message.workingDirectory : '';
+              
+              if (!pattern || !fileType) {
+                this.testRunnerPanel?.webview.postMessage({
+                  type: 'patternPreview',
+                  count: 0,
+                  files: []
+                });
+                break;
+              }
+
+              // Create a temporary config for pattern matching
+              const tempConfig: TestRunnerConfig = {
+                id: 'temp-preview',
+                title: 'Preview',
+                fileType: fileType as 'python' | 'javascript' | 'typescript',
+                fileNamePattern: pattern,
+                testNamePattern: '*',
+                runTestCommand: '',
+                activated: true,
+                workingDirectory: workingDirectory || undefined
+              };
+
+              // Get matching files (not tests, just files)
+              this.testRunnerManager.getMatchingFiles(tempConfig).then(files => {
+                const relativeFiles = files.map(file => {
+                  return vscode.workspace.asRelativePath(file, false).replace(/\\/g, '/');
+                });
+                
+                this.testRunnerPanel?.webview.postMessage({
+                  type: 'patternPreview',
+                  count: relativeFiles.length,
+                  files: relativeFiles.slice(0, 10) // First 10 files
+                });
+              }).catch(() => {
+                this.testRunnerPanel?.webview.postMessage({
+                  type: 'patternPreview',
+                  count: 0,
+                  files: []
+                });
+              });
+            } catch (error) {
+              this.testRunnerPanel?.webview.postMessage({
+                type: 'patternPreview',
+                count: 0,
+                files: []
+              });
+            }
           }
           break;
         case 'cancel':

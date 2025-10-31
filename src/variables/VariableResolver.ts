@@ -114,17 +114,36 @@ export class VariableResolver {
       }
 
       if (type === 'fixed') {
-        if (variableDefinition) {
-          resolved.push({ key, value: variableDefinition.value });
-        } else if (sharedVariable) {
-          resolved.push({ key, value: sharedVariable.value });
+        let value: string | undefined;
+        if (variableDefinition?.value) {
+          value = variableDefinition.value;
+        } else if (sharedVariable?.value) {
+          value = sharedVariable.value;
+        } else if (variableDefinition) {
+          // Variable definition exists but no value - try shared variable
+          if (sharedVariable) {
+            value = sharedVariable.value;
+          } else {
+            throw new MissingVariableError(key);
+          }
         } else {
           throw new MissingVariableError(key);
         }
+        
+        const { DebugLogger, DebugTag } = await import('../utils/DebugLogger');
+        DebugLogger.log(DebugTag.VARIABLE, `Resolved fixed variable`, {
+          key,
+          value,
+          source: variableDefinition?.value ? 'command' : 'shared'
+        });
+        
+        resolved.push({ key, value: value || '' });
         continue;
       }
 
       if (type === 'options') {
+        const { DebugLogger, DebugTag } = await import('../utils/DebugLogger');
+        
         let options: string[] = [];
         let quickPickLabel = key;
 
@@ -139,6 +158,12 @@ export class VariableResolver {
         } else {
           throw new MissingVariableError(key);
         }
+
+        DebugLogger.log(DebugTag.VARIABLE, `Resolving list variable`, {
+          key,
+          options,
+          source: variableDefinition ? 'command' : 'shared'
+        });
 
         // Add custom input option to the list
         const customInputOption = '✏️ Custom Input...';
@@ -156,6 +181,7 @@ export class VariableResolver {
 
         // If custom input was selected, prompt for manual input
         if (selection === customInputOption) {
+          DebugLogger.log(DebugTag.VARIABLE, `User selected custom input for ${key}`);
           const customInput = await vscode.window.showInputBox({
             prompt: `Enter custom value for ${quickPickLabel}`,
             placeHolder: 'Type your custom option here',
@@ -168,6 +194,12 @@ export class VariableResolver {
 
           finalValue = customInput || '';
         }
+
+        DebugLogger.log(DebugTag.VARIABLE, `Resolved list variable`, {
+          key,
+          value: finalValue,
+          wasCustom: selection === customInputOption
+        });
 
         resolved.push({ key, value: finalValue });
         continue;

@@ -7,18 +7,26 @@ try {
     console.log('Compiling TypeScript...');
     execSync('node node_modules/typescript/lib/tsc.js', { stdio: 'inherit' });
     
+    // Copy test files
+    console.log('Copying test files...');
+    const testSrc = path.join(__dirname, '..', 'test');
+    const testDest = path.join(__dirname, '..', 'out', 'test');
+    
     // Copy runTest.js
-    console.log('Copying runTest.js...');
-    const src = path.join(__dirname, '..', 'test', 'runTest.js');
-    const dest = path.join(__dirname, '..', 'out', 'test', 'runTest.js');
-    
-    // Ensure the destination directory exists
-    const destDir = path.dirname(dest);
-    if (!fs.existsSync(destDir)) {
-        fs.mkdirSync(destDir, { recursive: true });
+    const runTestSrc = path.join(testSrc, 'runTest.js');
+    const runTestDest = path.join(testDest, 'runTest.js');
+    const runTestDestDir = path.dirname(runTestDest);
+    if (!fs.existsSync(runTestDestDir)) {
+        fs.mkdirSync(runTestDestDir, { recursive: true });
     }
+    fs.copyFileSync(runTestSrc, runTestDest);
     
-    fs.copyFileSync(src, dest);
+    // Copy test suite directory
+    const suiteSrc = path.join(testSrc, 'suite');
+    const suiteDest = path.join(testDest, 'suite');
+    if (fs.existsSync(suiteSrc)) {
+        copyRecursive(suiteSrc, suiteDest);
+    }
 
     // Copy resources (webviews, icons, etc.) into out/resources
     console.log('Copying resources...');

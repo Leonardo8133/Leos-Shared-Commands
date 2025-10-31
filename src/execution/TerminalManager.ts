@@ -33,6 +33,21 @@ export class TerminalManager {
 
   public async executeCommand(command: string, config: TerminalConfig): Promise<void> {
     if (this.customRunner) {
+      // When using custom runner, still create/manage terminal if name is provided
+      if (config.name && config.type === 'vscode-new') {
+        const terminalName = config.name;
+        // Check if terminal exists and dispose it before creating a new one
+        let terminal = this.terminals.get(terminalName);
+        if (terminal) {
+          if (!this.isTerminalDisposed(terminal)) {
+            terminal.dispose();
+          }
+          this.terminals.delete(terminalName);
+        }
+        // Create a new terminal even with custom runner for tracking
+        terminal = this.createManagedTerminal(terminalName);
+        this.terminals.set(terminalName, terminal);
+      }
       await this.customRunner(command, config);
       return;
     }
@@ -106,6 +121,60 @@ export class TerminalManager {
     });
   }
 
+  // Run a command in a shared terminal panel (for batch execution)
+  public async executeCommandWithExitCodeInSharedTerminal(command: string, config: TerminalConfig): Promise<number> {
+    // Use VS Code Tasks with a shared panel so all tasks run in the same terminal
+    let cwd = config.cwd;
+    if (cwd && !path.isAbsolute(cwd) && vscode.workspace.workspaceFolders?.[0]) {
+      cwd = path.resolve(vscode.workspace.workspaceFolders[0].uri.fsPath, cwd);
+    } else if (!cwd && vscode.workspace.workspaceFolders?.[0]) {
+      cwd = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    }
+
+    const envEntries = Object.entries(process.env as Record<string, string | undefined>)
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string');
+    const safeEnv = Object.fromEntries(envEntries) as Record<string, string>;
+    const shellOptions: vscode.ShellExecutionOptions = {
+      cwd: cwd,
+      env: safeEnv
+    };
+    const shellExec = new vscode.ShellExecution(command, shellOptions);
+
+    // Use a consistent task name for shared panel
+    const taskName = config.name || 'Test Runner';
+    const task = new vscode.Task(
+      { type: 'shell' },
+      vscode.TaskScope.Workspace,
+      `${taskName} - ${Date.now()}`, // Unique name for each task
+      'Task and Documentation Hub',
+      shellExec,
+      []
+    );
+    // Use Shared panel so all tasks run in the same terminal panel
+    // Tasks with Shared panel and same task name will share the panel
+    task.presentationOptions = {
+      reveal: vscode.TaskRevealKind.Always,
+      panel: vscode.TaskPanelKind.Shared
+    };
+
+    return await new Promise<number>((resolve, reject) => {
+      let disposable: vscode.Disposable | undefined;
+      disposable = vscode.tasks.onDidEndTaskProcess((e) => {
+        try {
+          if (e.execution.task === task) {
+            disposable?.dispose();
+            resolve(typeof e.exitCode === 'number' ? e.exitCode : -1);
+          }
+        } catch (err) {
+          disposable?.dispose();
+          reject(err);
+        }
+      });
+
+      vscode.tasks.executeTask(task).then(undefined, reject);
+    });
+  }
+
   private async executeInCurrentTerminal(command: string, config: TerminalConfig): Promise<void> {
     const activeTerminal = vscode.window.activeTerminal;
     if (!activeTerminal) {
@@ -121,20 +190,39 @@ export class TerminalManager {
   }
 
   private async executeInNewTerminal(command: string, config: TerminalConfig): Promise<void> {
+    const { DebugLogger, DebugTag } = await import('../utils/DebugLogger');
     const terminalName = config.name || 'Task and Documentation Hub';
 
-    // Try to reuse existing terminal with the same name
+    DebugLogger.log(DebugTag.TERMINAL, `Executing in new terminal`, {
+      terminalName,
+      command,
+      existingTerminals: Array.from(this.terminals.keys())
+    });
+
+    // Check if terminal exists and dispose it before creating a new one
     let terminal = this.terminals.get(terminalName);
 
-    if (terminal && this.isTerminalDisposed(terminal)) {
+    if (terminal) {
+      DebugLogger.log(DebugTag.TERMINAL, `Found existing terminal, disposing`, {
+        terminalName,
+        isDisposed: this.isTerminalDisposed(terminal)
+      });
+      // Dispose existing terminal before creating a new one
+      if (!this.isTerminalDisposed(terminal)) {
+        terminal.dispose();
+      }
       this.terminals.delete(terminalName);
-      terminal = undefined;
     }
 
-    if (!terminal) {
-      terminal = this.createManagedTerminal(terminalName);
-      this.terminals.set(terminalName, terminal);
-    }
+    // Create a new terminal
+    terminal = this.createManagedTerminal(terminalName);
+    this.terminals.set(terminalName, terminal);
+
+    DebugLogger.log(DebugTag.TERMINAL, `Created new terminal`, {
+      terminalName,
+      actualName: terminal.name,
+      terminalCount: this.terminals.size
+    });
 
     terminal.show();
     await this.executeInTerminal(terminal, command, config);
@@ -180,7 +268,17 @@ export class TerminalManager {
   }
 
   public getTerminal(name: string): vscode.Terminal | undefined {
-    return this.terminals.get(name);
+    const terminal = this.terminals.get(name);
+    // Also check if there's a terminal with the exact name in VS Code's terminals
+    if (!terminal) {
+      const vscodeTerminal = vscode.window.terminals.find(t => t.name === name);
+      if (vscodeTerminal) {
+        // Track it if found
+        this.terminals.set(name, vscodeTerminal);
+        return vscodeTerminal;
+      }
+    }
+    return terminal;
   }
 
   public disposeTerminal(name: string): void {
