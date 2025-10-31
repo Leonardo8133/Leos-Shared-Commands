@@ -4,6 +4,7 @@ export interface CommandConfig {
   sharedVariables?: SharedVariable[];
   sharedLists?: SharedList[];
   testRunners?: TestRunnerConfig[];
+  pinnedCommands?: string[];
   version?: number;
   lastModified?: string;
 }
@@ -87,12 +88,6 @@ export interface SharedList {
   label: string;
   options: string[];
   description?: string;
-}
-
-export interface ConfigVersion {
-  version: number;
-  timestamp: string;
-  config: CommandConfig;
 }
 
 export enum ExecutionState {

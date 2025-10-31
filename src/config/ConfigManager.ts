@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { CommandConfig, ConfigVersion } from '../types';
+import { CommandConfig } from '../types';
 import { getDefaultConfig, validateConfig, getDefaultTestRunnerConfig } from './schema';
 
 export class ConfigManager {
@@ -40,9 +40,6 @@ export class ConfigManager {
       throw new Error(`Invalid configuration: ${validation.errors.join(', ')}`);
     }
 
-    // Save version before updating
-    await this.saveConfigVersion(this.config);
-
     // Update version and timestamp
     const version = (this.config.version || 0) + 1;
     config.version = version;
@@ -72,6 +69,10 @@ export class ConfigManager {
           // Ensure testRunners array exists (empty array is valid - user can delete default config)
           if (!this.config.testRunners) {
             this.config.testRunners = [];
+          }
+          // Ensure pinnedCommands array exists
+          if (!this.config.pinnedCommands) {
+            this.config.pinnedCommands = [];
           }
         } else {
           vscode.window.showWarningMessage(
@@ -159,64 +160,5 @@ export class ConfigManager {
   public async exportCommands(filePath: string): Promise<void> {
     const configJson = JSON.stringify(this.config, null, 2);
     await fs.promises.writeFile(filePath, configJson, 'utf8');
-  }
-
-  private async saveConfigVersion(config: CommandConfig): Promise<void> {
-    const versionsPath = path.join(path.dirname(this.configPath), 'commands-versions.json');
-    let versions: ConfigVersion[] = [];
-
-    try {
-      if (fs.existsSync(versionsPath)) {
-        const versionsData = await fs.promises.readFile(versionsPath, 'utf8');
-        versions = JSON.parse(versionsData);
-      }
-    } catch (error) {
-      // Silent fail
-    }
-
-    // Add current config as version
-    versions.push({
-      version: config.version || 0,
-      timestamp: config.lastModified || new Date().toISOString(),
-      config: { ...config }
-    });
-
-    // Keep only last 5 versions
-    if (versions.length > 5) {
-      versions = versions.slice(-5);
-    }
-
-    // Save versions
-    try {
-      await fs.promises.writeFile(versionsPath, JSON.stringify(versions, null, 2), 'utf8');
-    } catch (error) {
-      // Silent fail
-    }
-  }
-
-  public async getConfigVersions(): Promise<ConfigVersion[]> {
-    const versionsPath = path.join(path.dirname(this.configPath), 'commands-versions.json');
-    
-    try {
-      if (fs.existsSync(versionsPath)) {
-        const versionsData = await fs.promises.readFile(versionsPath, 'utf8');
-        return JSON.parse(versionsData);
-      }
-    } catch (error) {
-      // Silent fail
-    }
-    
-    return [];
-  }
-
-  public async restoreConfigVersion(version: number): Promise<void> {
-    const versions = await this.getConfigVersions();
-    const targetVersion = versions.find(v => v.version === version);
-    
-    if (targetVersion) {
-      await this.saveConfig(targetVersion.config);
-    } else {
-      throw new Error(`Version ${version} not found`);
-    }
   }
 }

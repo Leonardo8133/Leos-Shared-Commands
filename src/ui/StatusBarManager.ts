@@ -7,7 +7,7 @@ export class StatusBarManager implements vscode.Disposable {
   private readonly mainItem: vscode.StatusBarItem;
   private readonly pinnedItems = new Map<string, vscode.StatusBarItem>();
   private pinnedCommandIds: string[] = [];
-  private readonly storageKey = 'commandManager.pinnedCommands';
+  private isRebuilding = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -42,7 +42,7 @@ export class StatusBarManager implements vscode.Disposable {
   public async togglePin(command: Command): Promise<boolean> {
     if (this.isPinned(command.id)) {
       this.pinnedCommandIds = this.pinnedCommandIds.filter(id => id !== command.id);
-      await this.context.globalState.update(this.storageKey, this.pinnedCommandIds);
+      await this.savePinnedCommands();
       await this.rebuildPinnedItems();
       void vscode.window.showInformationMessage(`Removed "${command.label}" from the status bar.`);
       return false;
@@ -52,7 +52,7 @@ export class StatusBarManager implements vscode.Disposable {
       this.pinnedCommandIds.push(command.id);
     }
     this.pinnedCommandIds = Array.from(new Set(this.pinnedCommandIds));
-    await this.context.globalState.update(this.storageKey, this.pinnedCommandIds);
+    await this.savePinnedCommands();
     await this.rebuildPinnedItems();
     void vscode.window.showInformationMessage(`Pinned "${command.label}" to the status bar.`);
     return true;
@@ -64,34 +64,65 @@ export class StatusBarManager implements vscode.Disposable {
   }
 
   public async handleConfigChange(): Promise<void> {
+    // Reload pinned commands from config when config changes
+    const config = this.configManager.getConfig();
+    this.pinnedCommandIds = config.pinnedCommands || [];
     await this.rebuildPinnedItems();
   }
 
   private async restorePinnedCommands(): Promise<void> {
-    const stored = this.context.globalState.get<string[]>(this.storageKey, []);
+    const config = this.configManager.getConfig();
+    const stored = config.pinnedCommands || [];
     if (Array.isArray(stored)) {
       this.pinnedCommandIds = Array.from(new Set(stored));
     }
     await this.rebuildPinnedItems();
   }
 
+  private async savePinnedCommands(): Promise<void> {
+    const config = this.configManager.getConfig();
+    config.pinnedCommands = [...this.pinnedCommandIds];
+    await this.configManager.saveConfig(config);
+  }
+
   private async rebuildPinnedItems(): Promise<void> {
-    const commands = await this.treeProvider.getAllCommands();
-    const commandsById = new Map(commands.map(command => [command.id, command]));
+    if (this.isRebuilding) {
+      return; // Prevent re-entrancy
+    }
 
-    this.disposePinnedItems();
+    this.isRebuilding = true;
+    try {
+      const commands = await this.treeProvider.getAllCommands();
+      const commandsById = new Map(commands.map(command => [command.id, command]));
 
-    this.pinnedCommandIds = this.pinnedCommandIds.filter(id => commandsById.has(id));
-    await this.context.globalState.update(this.storageKey, this.pinnedCommandIds);
+      // Clean all pinned items first
+      this.disposePinnedItems();
 
-    this.pinnedCommandIds.forEach((id, index) => {
-      const command = commandsById.get(id);
-      if (command) {
-        this.createPinnedItem(command, index);
+      // Filter out invalid command IDs
+      this.pinnedCommandIds = this.pinnedCommandIds.filter(id => commandsById.has(id));
+      
+      // Save filtered list if it changed (but skip if we're being called from handleConfigChange)
+      const config = this.configManager.getConfig();
+      const configPinned = config.pinnedCommands || [];
+      if (JSON.stringify(configPinned) !== JSON.stringify(this.pinnedCommandIds)) {
+        // Only save if we're not being called due to a config change (to avoid loops)
+        // We'll update the config directly without triggering another change
+        config.pinnedCommands = [...this.pinnedCommandIds];
+        await this.configManager.saveConfig(config);
       }
-    });
 
-    await this.updateCommandsTooltip();
+      // Rebuild all pinned items
+      this.pinnedCommandIds.forEach((id, index) => {
+        const command = commandsById.get(id);
+        if (command) {
+          this.createPinnedItem(command, index);
+        }
+      });
+
+      await this.updateCommandsTooltip();
+    } finally {
+      this.isRebuilding = false;
+    }
   }
 
   private createPinnedItem(command: Command, index: number): void {
