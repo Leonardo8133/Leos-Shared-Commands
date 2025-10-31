@@ -3,8 +3,8 @@ import { CommandConfig, TestRunnerConfig } from '../types';
 export function getDefaultTestRunnerConfig(): TestRunnerConfig {
   return {
     id: 'test-runner-default',
-    activated: true,
-    title: 'JavaScript Tests',
+    activated: false,
+    title: 'Sample Configuration',
     fileType: 'javascript',
     workingDirectory: '',
     fileNamePattern: 'test_*\n*test*\n*.spec.*',

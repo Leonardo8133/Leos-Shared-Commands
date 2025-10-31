@@ -468,8 +468,8 @@
       </div>
       <div>
         <label for="ignoreList">Ignore list</label>
-        <textarea id="ignoreList" placeholder="test_to_skip"></textarea>
-        <div class="help-text">Tests added here will be ignored.</div>
+        <textarea id="ignoreList" placeholder="burlap&#10;*legacy*"></textarea>
+        <div class="help-text">Patterns to ignore tests, files, or folders. Supports wildcards. One pattern per line. Matches test names and folder/file paths.</div>
       </div>
     </div>
     <div>
@@ -488,19 +488,18 @@
               
               <div class="variable-item">
                 <strong class="variable-executable">$executable_test_path</strong>
-                <p>Full executable path for running a specific test. Includes module path, class name, and method name.</p>
-                <p><strong>Format options:</strong> Add <code>:dot</code>, <code>:slash</code>, or <code>:hyphen</code> to control separators. Default uses dots.</p>
+                <p>Full executable path for running a specific test. Always uses dot notation (e.g., <code>src.main.tests.test_file.TestCase.test_method</code>). Includes module path, class name, and method name.</p>
+                <p><strong>Trim parent option:</strong> Use <code>:trimparent=number</code> to remove parent segments from the beginning of the path.</p>
                 <ul style="margin: 8px 0; padding-left: 20px;">
-                  <li><code>$executable_test_path</code> - Default (dot separator)</li>
-                  <li><code>$executable_test_path:dot</code> - Use dots: <code>src.test.file.Class.method</code></li>
-                  <li><code>$executable_test_path:slash</code> - Use slashes: <code>src/test/file/Class/method</code></li>
-                  <li><code>$executable_test_path:hyphen</code> - Use hyphens: <code>src-test-file-Class-method</code></li>
+                  <li><code>$executable_test_path</code> - Default: <code>src.main.tests.test_file.TestCase.test_method</code></li>
+                  <li><code>$executable_test_path:trimparent=1</code> - Remove 1 parent: <code>main.tests.test_file.TestCase.test_methodd</code></li>
+                  <li><code>$executable_test_path:trimparent=2</code> - Remove 2 parents: <code>tests.test_file.TestCase.test_method</code></li>
                 </ul>
                 <p><strong>Language-specific behavior:</strong></p>
                 <ul style="margin: 8px 0; padding-left: 20px;">
-                  <li><strong>Python:</strong> Module path + class + method (relative to working directory). Example: <code>tests.test_file.TestCase.test_method</code></li>
+                  <li><strong>Python:</strong> Module path + class + method (relative to working directory). Example: <code>src.main.tests.test_file.TestCase.test_method</code></li>
                   <li><strong>JavaScript/TypeScript:</strong> File path + test name. Example: <code>src.tests.test_file.test_method</code></li>
-                </p>
+                </ul>
               </div>
 
               <div class="variable-item">
@@ -548,6 +547,7 @@
               <div class="example-box">
                 <strong>Example:</strong> For file <code>src/test/general_test.py</code> with test method <code>test_simple_task</code> inside class <code>TestCase</code>
                 <code>$executable_test_path = src.test.general_test.TestCase.test_simple_task</code>
+                <code>$executable_test_path:trimparent=1 = test.general_test.TestCase.test_simple_task</code>
                 <code>$test_name = TestCase.test_simple_task</code>
                 <code>$test_testcase = TestCase</code>
                 <code>$test_file = general_test</code>
@@ -621,17 +621,20 @@
               </div>
 
               <h4>Ignore List</h4>
-              <p>Exclude specific files or directories from test discovery:</p>
+              <p>Exclude specific tests, files, or folders from test discovery. Patterns match both test names and file/folder paths.</p>
               <ul style="margin: 8px 0; padding-left: 20px;">
                 <li>One pattern per line</li>
-                <li>Use <code>*</code> as wildcard</li>
+                <li>Use <code>*</code> as wildcard for flexible matching</li>
+                <li>Matches test names, file paths, folder paths, and individual folder names</li>
                 <li>Automatically excludes common directories: <code>node_modules</code>, <code>out</code>, <code>__pycache__</code>, <code>.env</code>, etc.</li>
               </ul>
               <p><strong>Examples:</strong></p>
               <ul style="margin: 8px 0; padding-left: 20px;">
-                <li><code>**/legacy/**</code> - Ignore all files in legacy folders</li>
-                <li><code>**/*_skip.test.js</code> - Ignore all skip test files</li>
-                <li><code>test_old.py</code> - Ignore specific file</li>
+                <li><code>burlap</code> - Ignore all tests in folders named "burlap" or tests with "burlap" in the name</li>
+                <li><code>*burlap*</code> - Ignore any path containing "burlap" anywhere</li>
+                <li><code>tests/burlap/*</code> - Ignore all tests in the <code>tests/burlap/</code> folder</li>
+                <li><code>test_old</code> - Ignore tests/files with "test_old" in the name</li>
+                <li><code>legacy/*</code> - Ignore all tests in any "legacy" folder</li>
               </ul>
 
               <h4>Auto Find Feature</h4>

@@ -7,6 +7,7 @@ export type TestRunnerTreeItemType = 'config' | 'test' | 'placeholder' | 'folder
 export type TestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
 export class TestRunnerTreeItem extends vscode.TreeItem {
+  private static placeholderCounter = 0;
   public testStatus: TestStatus = 'idle';
 
   constructor(
@@ -86,7 +87,10 @@ export class TestRunnerTreeItem extends vscode.TreeItem {
         arguments: [config, test]
       };
     } else if (itemType === 'placeholder') {
-      this.id = `test-runner-placeholder-${config.id}`;
+      // Make placeholder ID unique using a counter to avoid duplicate ID errors
+      // VS Code requires unique IDs across all tree items
+      const uniqueId = ++TestRunnerTreeItem.placeholderCounter;
+      this.id = `test-runner-placeholder-${config.id}-${uniqueId}`;
       this.iconPath = new vscode.ThemeIcon('info');
       this.contextValue = 'testRunnerEmpty';
       this.tooltip = placeholderText || 'Adjust the file or test name patterns to discover tests.';

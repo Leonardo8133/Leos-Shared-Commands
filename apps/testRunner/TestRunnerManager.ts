@@ -56,6 +56,7 @@ export class TestRunnerManager {
     this._onDidChange.dispose();
   }
 
+
   public getConfigs(): TestRunnerConfig[] {
     const config = this.configManager.getConfig();
     return [...(config.testRunners ?? [])];
@@ -1074,48 +1075,78 @@ export class TestRunnerManager {
   private injectVariables(template: string, replacements: Record<string, string>): string {
     let result = template;
     
-    // First, handle variables with format options (e.g., $test_path:dot, $executable_test_path:slash)
-    // Pattern: $variable_name:format
-    const formatPattern = /\$(\w+):(\w+)/g;
-    let formatMatch: RegExpExecArray | null;
-    while ((formatMatch = formatPattern.exec(template)) !== null) {
-      const [fullMatch, varName, format] = formatMatch;
-      const baseValue = replacements[varName] || '';
-      let formattedValue = baseValue;
+    // Pattern to match variables with options: $var:option1:option2=value
+    // Supports: $executable_test_path:trimparent=1, $test_path:dot, etc.
+    const variablePattern = /\$(\w+)((?::[\w=]+)+)/g;
+    const processedMatches = new Set<string>();
+    let match: RegExpExecArray | null;
+    
+    // First pass: handle variables with options
+    while ((match = variablePattern.exec(template)) !== null) {
+      const [fullMatch, varName, options] = match;
+      if (processedMatches.has(fullMatch)) continue;
+      processedMatches.add(fullMatch);
       
-      if (baseValue) {
-        switch (format) {
-          case 'dot':
-            formattedValue = baseValue.replace(/[\/\\]/g, '.');
-            break;
-          case 'slash':
-            formattedValue = baseValue.replace(/[\\]/g, '/');
-            break;
-          case 'hyphen':
-            formattedValue = baseValue.replace(/[\/\\\.]/g, '-');
-            break;
-          default:
-            formattedValue = baseValue;
+      const baseValue = replacements[varName] || '';
+      if (!baseValue) {
+        result = result.replace(fullMatch, '');
+        continue;
+      }
+      
+      let formattedValue = baseValue;
+      const optionParts = options.split(':').filter(Boolean);
+      
+      // For executable_test_path, always use dot format (ignore :dot, :slash, :hyphen)
+      if (varName === 'executable_test_path') {
+        formattedValue = baseValue.replace(/[\/\\]/g, '.');
+        
+        // Parse trimparent option
+        for (const option of optionParts) {
+          if (option.startsWith('trimparent=')) {
+            const trimCount = parseInt(option.substring('trimparent='.length), 10);
+            if (!isNaN(trimCount) && trimCount > 0) {
+              // Split by dots and remove the specified number of parent segments
+              const parts = formattedValue.split('.');
+              if (parts.length > trimCount) {
+                formattedValue = parts.slice(trimCount).join('.');
+              } else {
+                formattedValue = parts[parts.length - 1]; // Keep at least the last part
+              }
+            }
+          }
+        }
+      } else {
+        // For other variables, support dot, slash, hyphen formats
+        for (const option of optionParts) {
+          switch (option) {
+            case 'dot':
+              formattedValue = formattedValue.replace(/[\/\\]/g, '.');
+              break;
+            case 'slash':
+              formattedValue = formattedValue.replace(/[\\]/g, '/');
+              break;
+            case 'hyphen':
+              formattedValue = formattedValue.replace(/[\/\\\.]/g, '-');
+              break;
+          }
         }
       }
       
       result = result.replace(fullMatch, formattedValue);
     }
     
-    // Then handle simple variables (without format)
-    // For executable_test_path without format, default to dot format
+    // Second pass: handle simple variables without options
+    // For executable_test_path, default to dot format
     for (const [key, value] of Object.entries(replacements)) {
       const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const simplePattern = new RegExp(`\\$${escapedKey}(?!:)`, 'g');
       
-      // Special handling: executable_test_path defaults to dot format if no format specified
       if (key === 'executable_test_path') {
-        const pattern = new RegExp(`\\$${escapedKey}(?!:)`, 'g');
+        // Always use dot format for executable_test_path
         const dotFormatted = value.replace(/[\/\\]/g, '.');
-        result = result.replace(pattern, dotFormatted);
+        result = result.replace(simplePattern, dotFormatted);
       } else {
-        // Only replace if not already replaced by format option
-        const pattern = new RegExp(`\\$${escapedKey}(?!:)`, 'g');
-        result = result.replace(pattern, value);
+        result = result.replace(simplePattern, value);
       }
     }
     
@@ -1126,14 +1157,15 @@ export class TestRunnerManager {
     const validVariables = ['test_name', 'test_testcase', 'test_file', 'test_path', 'test_extension', 'executable_test_path', 'file', 'line'];
     const validFormats = ['dot', 'slash', 'hyphen'];
     
-    // Extract all variables (with or without format options)
-    const variablePattern = /\$(\w+)(?::(\w+))?/g;
+    // Extract all variables with options (e.g., $var:option1:option2=value)
+    const variablePattern = /\$(\w+)((?::[\w=]+)+)?/g;
     const foundVariables = new Set<string>();
+    const invalidOptions = new Set<string>();
     let match: RegExpExecArray | null;
     
     while ((match = variablePattern.exec(command)) !== null) {
       const varName = match[1];
-      const format = match[2];
+      const options = match[2] || '';
       
       // Check if variable name is valid
       if (!validVariables.includes(varName)) {
@@ -1141,12 +1173,24 @@ export class TestRunnerManager {
         continue;
       }
       
-      // Check if format is valid (if provided)
-      if (format && !validFormats.includes(format)) {
-        throw new Error(
-          `Invalid format "${format}" for variable $${varName}. ` +
-          `Valid formats: ${validFormats.join(', ')}.`
-        );
+      // Parse options
+      if (options) {
+        const optionParts = options.split(':').filter(Boolean);
+        for (const option of optionParts) {
+          if (option.startsWith('trimparent=')) {
+            // Validate trimparent option
+            const trimValue = option.substring('trimparent='.length);
+            const trimCount = parseInt(trimValue, 10);
+            if (isNaN(trimCount) || trimCount < 0) {
+              invalidOptions.add(`trimparent=${trimValue}`);
+            }
+          } else if (varName === 'executable_test_path') {
+            // For executable_test_path, ignore dot/slash/hyphen (they're ignored anyway)
+            // But don't throw error for backwards compatibility
+          } else if (!validFormats.includes(option)) {
+            invalidOptions.add(option);
+          }
+        }
       }
     }
     
@@ -1155,6 +1199,13 @@ export class TestRunnerManager {
       throw new Error(
         `Invalid variable(s) in test command: ${invalidVariables.map(v => `$${v}`).join(', ')}. ` +
         `Available variables: ${validVariables.map(v => `$${v}`).join(', ')}.`
+      );
+    }
+    
+    if (invalidOptions.size > 0) {
+      throw new Error(
+        `Invalid option(s) in test command: ${Array.from(invalidOptions).join(', ')}. ` +
+        `Valid options: ${validFormats.join(', ')}, trimparent=number.`
       );
     }
   }
@@ -1177,19 +1228,67 @@ class BasePattern {
 
   protected patternToRegex(pattern: string): RegExp {
     if (!pattern || pattern.trim().length === 0) return new RegExp('.*', 'i');
-    const placeholder = '__WILDCARD__';
-    const withPlaceholders = pattern.replace(/\*/g, placeholder);
-    const escaped = withPlaceholders.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-    const wildcard = escaped.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '.*');
-    let regexPattern = wildcard;
-    if (!regexPattern.startsWith('^')) regexPattern = '^' + regexPattern;
-    if (!regexPattern.endsWith('$')) regexPattern = regexPattern + '$';
-    try { return new RegExp(regexPattern, 'i'); } catch { return new RegExp('.*', 'i'); }
+    // Convert wildcard pattern to regex directly
+    // Split by * to handle multiple wildcards, then join with .*
+    const parts = pattern.split('*');
+    // Escape each part (except the wildcards which are represented by the splits)
+    const escapedParts = parts.map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+    // Join with .* (regex for any characters)
+    const regexPattern = escapedParts.join('.*');
+    // Add anchors
+    let finalPattern = regexPattern;
+    if (!finalPattern.startsWith('^')) finalPattern = '^' + finalPattern;
+    if (!finalPattern.endsWith('$')) finalPattern = finalPattern + '$';
+    try { return new RegExp(finalPattern, 'i'); } catch { return new RegExp('.*', 'i'); }
   }
 
   protected matchesAny(value: string, set: { matchers: RegExp[] }): boolean {
     if (set.matchers.length === 0) return true;
     return set.matchers.some(r => r.test(value));
+  }
+
+  /**
+   * Check if a test should be ignored based on ignore patterns.
+   * Checks both test name and file path (including folder paths).
+   * Supports wildcards in patterns (e.g., "*burlap*", "tests/burlap/*").
+   */
+  protected shouldIgnoreTest(testName: string, filePath: string, ignorePatterns: { matchers: RegExp[] }): boolean {
+    if (ignorePatterns.matchers.length === 0) return false;
+    
+    // Normalize path separators
+    const relativePath = filePath.replace(/\\/g, '/');
+    // Get path without extension for matching
+    const pathWithoutExt = relativePath.replace(/\.[^.]+$/, '');
+    // Get folder path (directory part, without filename)
+    const folderPath = relativePath.substring(0, relativePath.lastIndexOf('/')) || '.';
+    // Get individual folder names in the path
+    const folderParts = folderPath.split('/').filter(Boolean);
+    
+    // Check if any ignore pattern matches:
+    // 1. Test name (e.g., "test_legacy")
+    // 2. Full file path without extension (e.g., "tests/burlap/test_file")
+    // 3. Folder path (e.g., "tests/burlap" or "tests/integration/burlap")
+    // 4. Any individual folder name (e.g., "burlap" will match if folder is "burlap")
+    // 5. Full path with extension (for patterns like "*burlap*.js")
+    
+    // Check test name
+    if (this.matchesAny(testName, ignorePatterns)) return true;
+    
+    // Check full path (supports wildcards like "*burlap*")
+    if (this.matchesAny(relativePath, ignorePatterns)) return true;
+    
+    // Check path without extension
+    if (this.matchesAny(pathWithoutExt, ignorePatterns)) return true;
+    
+    // Check folder path (supports patterns like "tests/burlap/*" or "*burlap*")
+    if (this.matchesAny(folderPath, ignorePatterns)) return true;
+    
+    // Check each folder name individually (supports patterns like "burlap" or "*burlap*")
+    for (const folder of folderParts) {
+      if (this.matchesAny(folder, ignorePatterns)) return true;
+    }
+    
+    return false;
   }
 }
 
@@ -1200,6 +1299,9 @@ class PythonPattern extends BasePattern implements LanguagePattern {
     const testNamePatterns = this.createPatternSet(config.testNamePattern);
     const allowNonTest = config.allowNonTest === true;
     const matchAll = allowNonTest && (testNamePatterns.matchers.length === 0 || (testNamePatterns.matchers.length === 1 && testNamePatterns.matchers[0].toString() === '/^.*$/i'));
+
+    // Get relative file path for ignore checking
+    const relativeFilePath = vscode.workspace.asRelativePath(document.uri, false).replace(/\\/g, '/');
 
     // Gather class definitions
     const classDefs: Array<{ name: string; indent: number; lineIdx: number }> = [];
@@ -1225,7 +1327,8 @@ class PythonPattern extends BasePattern implements LanguagePattern {
       if (containing.length > 0) qualified = `${containing[0].name}.${method}`;
 
       if (!this.matchesAny(qualified, testNamePatterns)) continue;
-      if (ignorePatterns.matchers.length > 0 && this.matchesAny(qualified, ignorePatterns)) continue;
+      // Check ignore patterns against both test name and file/folder path
+      if (this.shouldIgnoreTest(qualified, relativeFilePath, ignorePatterns)) continue;
 
       const position = new vscode.Position(i, Math.max(0, line.indexOf(method)));
       const range = new vscode.Range(position, position);
@@ -1242,6 +1345,10 @@ class JavaScriptPattern extends BasePattern implements LanguagePattern {
     const lines = document.getText().split(/\r?\n/);
     const ignorePatterns = this.createPatternSet(config.ignoreList ?? '');
     const testNamePatterns = this.createPatternSet(config.testNamePattern);
+    
+    // Get relative file path for ignore checking
+    const relativeFilePath = vscode.workspace.asRelativePath(document.uri, false).replace(/\\/g, '/');
+    
     const results: DiscoveredTest[] = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -1249,7 +1356,8 @@ class JavaScriptPattern extends BasePattern implements LanguagePattern {
       if (!m) continue;
       const name = m[1];
       if (!this.matchesAny(name, testNamePatterns)) continue;
-      if (ignorePatterns.matchers.length > 0 && this.matchesAny(name, ignorePatterns)) continue;
+      // Check ignore patterns against both test name and file/folder path
+      if (this.shouldIgnoreTest(name, relativeFilePath, ignorePatterns)) continue;
       const col = Math.max(0, line.indexOf(m[0]));
       const range = new vscode.Range(new vscode.Position(i, col), new vscode.Position(i, col));
       const id = `${config.id}:${document.uri.toString()}:${i}`;

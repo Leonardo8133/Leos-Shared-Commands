@@ -69,11 +69,9 @@ export class ConfigManager {
         
         if (validation.valid) {
           this.config = parsedConfig;
-          // Ensure testRunners array exists and has at least one default config
-          if (!this.config.testRunners || this.config.testRunners.length === 0) {
-            this.config.testRunners = [getDefaultTestRunnerConfig()];
-            // Save the updated config with default test runner
-            await this.saveConfig(this.config);
+          // Ensure testRunners array exists (empty array is valid - user can delete default config)
+          if (!this.config.testRunners) {
+            this.config.testRunners = [];
           }
         } else {
           vscode.window.showWarningMessage(

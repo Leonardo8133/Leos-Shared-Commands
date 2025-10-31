@@ -264,8 +264,29 @@ export class WebviewManager {
             const sanitized = this.sanitizeTestRunnerInput(message.config);
             
             await this.testRunnerManager.saveConfig(sanitized);
-            // Do NOT trigger discovery on save to avoid loops; just update editor state
+            // Update editor state
             this.sendTestRunnerState(sanitized, true);
+            
+            // Trigger test discovery after save
+            if (sanitized.activated && this.testRunnerTreeProvider) {
+              try {
+                const tests = await this.testRunnerManager.discoverAndCacheTests(sanitized, this.testRunnerTreeProvider);
+                // Send discovered tests to the editor
+                this.testRunnerPanel?.webview.postMessage({ 
+                  type: 'testsDiscovered', 
+                  tests: tests.map(t => ({
+                    label: t.label,
+                    file: t.file.fsPath,
+                    filePath: vscode.workspace.asRelativePath(t.file, false),
+                    line: t.line
+                  }))
+                });
+              } catch (discoveryError) {
+                // Don't fail the save if discovery fails, just log it
+                console.error('Test discovery failed after save:', discoveryError);
+              }
+            }
+            
             vscode.window.showInformationMessage(`Saved test runner "${sanitized.title}".`);
           } catch (error) {
             const messageText = error instanceof Error ? error.message : String(error);

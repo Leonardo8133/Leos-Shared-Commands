@@ -2,10 +2,10 @@
 
 <div align="center">
 
-[![Visual Studio Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.0-blue?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=LeonardoSouza.command-manager)
-[![Open VSX Registry](https://img.shields.io/badge/Open%20VSX-v1.3.0-purple?logo=open-vsx)](https://open-vsx.org/extension/LeonardoSouza/command-manager)
-[![Installs](https://img.shields.io/badge/Installs-2+-green?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=LeonardoSouza.command-manager)
-[![Build Status](https://img.shields.io/badge/Build-Passing-success?logo=github)](https://github.com/Leonardo8133/Leos-Shared-Commands)
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/LeonardoSouza.command-manager?label=VS%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=LeonardoSouza.command-manager)
+[![Open VSX Registry](https://img.shields.io/open-vsx/v/LeonardoSouza/command-manager?label=Open%20VSX&logo=open-vsx)](https://open-vsx.org/extension/LeonardoSouza/command-manager)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/LeonardoSouza.command-manager?label=Installs&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=LeonardoSouza.command-manager)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Leonardo8133/Leos-Shared-Commands/ci.yml?label=Build&logo=github)](https://github.com/Leonardo8133/Leos-Shared-Commands/actions)
 
 </div>
 
@@ -119,8 +119,9 @@ Set up and run tests with intelligent discovery:
      - Patterns are extension-agnostic (automatically ignore extensions)
      - Real-time preview widget shows matching files as you type
    - **Test Name Pattern**: Regex pattern to match test names (e.g., `(it|test|describe)\(`)
-   - **Run Test Command**: Command to execute tests (use `$test`, `$test_file`, `$executable_test_path` placeholders)
-   - **Ignore List**: Patterns to exclude (e.g., `**/node_modules/**`)
+   - **Run Test Command**: Command to execute tests (use `$test_name`, `$test_file`, `$executable_test_path` placeholders)
+     - Use `$executable_test_path:trimparent=1` to remove parent segments (e.g., remove `src.` prefix)
+   - **Ignore List**: Patterns to exclude tests, files, or folders (supports wildcards, matches folder paths)
    - **Auto Find**: Toggle automatic test discovery on extension load
 4. Save the configuration (stored in `.vscode/commands.json`)
 5. Click **Find Tests** to discover tests (or wait for auto-discovery if enabled)
