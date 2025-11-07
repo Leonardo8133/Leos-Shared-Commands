@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Command, CommandConfig, Folder, TestRunnerConfig } from '../../types';
+import { Command, CommandConfig, Folder, TestRunnerConfig, Timer, SubTimer } from '../../types';
 import { ConfigManager } from '../../config/ConfigManager';
 import { CommandTreeProvider } from '../../../apps/tasks/treeView/CommandTreeProvider';
 import { VariableResolver } from '../../variables/VariableResolver';
 import { TestRunnerManager } from '../../../apps/testRunner/TestRunnerManager';
 import { TestRunnerTreeProvider } from '../../../apps/testRunner/TestRunnerTreeProvider';
+import { TimeTrackerManager } from '../../../apps/timeTracker/TimeTrackerManager';
 
 interface CommandEditorContext {
   folderPath?: number[];
@@ -25,11 +26,14 @@ export class WebviewManager {
   private folderPanel?: vscode.WebviewPanel;
   private configPanel?: vscode.WebviewPanel;
   private testRunnerPanel?: vscode.WebviewPanel;
+  private timerPanel?: vscode.WebviewPanel;
 
   private readonly configManager = ConfigManager.getInstance();
   private readonly variableResolver = VariableResolver.getInstance();
   private readonly testRunnerManager = TestRunnerManager.getInstance();
+  private readonly timeTrackerManager = TimeTrackerManager.getInstance();
   private testRunnerTreeProvider?: { cacheTests: (configId: string, tests: any[]) => void; setTestsStatus?: (tests: any[], status: 'idle' | 'running' | 'passed' | 'failed') => void; refresh?: (item?: any) => void };
+  private timeTrackerTreeProvider?: { refresh: () => void };
   private treeProvider?: CommandTreeProvider;
 
   private constructor() {}
@@ -47,6 +51,10 @@ export class WebviewManager {
 
   public setTestRunnerTreeProvider(provider: { cacheTests: (configId: string, tests: any[]) => void; setTestsStatus?: (tests: any[], status: 'idle' | 'running' | 'passed' | 'failed') => void; refresh?: (item?: any) => void }): void {
     this.testRunnerTreeProvider = provider;
+  }
+
+  public setTimeTrackerTreeProvider(provider: { refresh: () => void }): void {
+    this.timeTrackerTreeProvider = provider;
   }
 
   public showCommandEditor(command?: Command, context?: CommandEditorContext): void {
@@ -918,6 +926,219 @@ export class WebviewManager {
     this.replaceFolderAtPath(current.subfolders, rest, folder);
   }
 
+
+  public showTimerEditor(timerId: string): void {
+    // Find timer in config
+    const configManager = ConfigManager.getInstance();
+    const timeTrackerConfig = configManager.getTimeTrackerConfig();
+    
+    const findTimer = (folders: typeof timeTrackerConfig.folders): Timer | undefined => {
+      for (const folder of folders) {
+        for (const timer of folder.timers) {
+          if (timer.id === timerId) return timer;
+        }
+        if (folder.subfolders) {
+          const found = findTimer(folder.subfolders);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    
+    const timer = findTimer(timeTrackerConfig.folders);
+    if (!timer) {
+      vscode.window.showErrorMessage('Timer not found');
+      return;
+    }
+
+    if (this.timerPanel) {
+      this.timerPanel.reveal();
+      this.timerPanel.title = `Edit ${timer.label}`;
+      this.sendTimerEditorState(timer);
+      return;
+    }
+
+    this.timerPanel = vscode.window.createWebviewPanel(
+      'timerEditor',
+      `Edit ${timer.label}`,
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [this.getWebviewRoot()]
+      }
+    );
+
+    this.timerPanel.webview.html = this.getHtmlContent('timer-editor.html', this.timerPanel.webview);
+
+    this.timerPanel.webview.onDidReceiveMessage(async (message) => {
+      switch (message.type) {
+        case 'ready':
+          this.sendTimerEditorState(timer);
+          break;
+        case 'saveTimer':
+          try {
+            await this.saveTimer(message.timer as Timer);
+            const updatedTimer = this.findTimerById(timerId);
+            if (updatedTimer) {
+              this.sendTimerEditorState(updatedTimer);
+            }
+            this.timeTrackerTreeProvider?.refresh();
+            vscode.window.showInformationMessage(`Timer "${(message.timer as Timer).label}" saved.`);
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to save timer: ${messageText}`);
+          }
+          break;
+        case 'updateTimerDates':
+          try {
+            await this.timeTrackerManager.updateTimerDates(
+              timerId,
+              message.startTime,
+              message.endTime
+            );
+            const updatedTimer = this.findTimerById(timerId);
+            if (updatedTimer) {
+              this.sendTimerEditorState(updatedTimer);
+            }
+            this.timeTrackerTreeProvider?.refresh();
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to update dates: ${messageText}`);
+          }
+          break;
+        case 'editSubTimer':
+          try {
+            await this.timeTrackerManager.editSubTimer(
+              timerId,
+              message.subtimerId,
+              { label: message.label, description: message.description }
+            );
+            const updatedTimer = this.findTimerById(timerId);
+            if (updatedTimer) {
+              this.sendTimerEditorState(updatedTimer);
+            }
+            this.timeTrackerTreeProvider?.refresh();
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to edit subtimer: ${messageText}`);
+          }
+          break;
+        case 'updateSubTimerDates':
+          try {
+            await this.timeTrackerManager.updateSubTimerDates(
+              timerId,
+              message.subtimerId,
+              message.startTime,
+              message.endTime
+            );
+            const updatedTimer = this.findTimerById(timerId);
+            if (updatedTimer) {
+              this.sendTimerEditorState(updatedTimer);
+            }
+            this.timeTrackerTreeProvider?.refresh();
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to update subtimer dates: ${messageText}`);
+          }
+          break;
+        case 'reorderSubTimers':
+          try {
+            await this.timeTrackerManager.reorderSubTimers(timerId, message.subtimerIds as string[]);
+            const updatedTimer = this.findTimerById(timerId);
+            if (updatedTimer) {
+              this.sendTimerEditorState(updatedTimer);
+            }
+            this.timeTrackerTreeProvider?.refresh();
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to reorder subtimers: ${messageText}`);
+          }
+          break;
+        case 'deleteSubTimer':
+          try {
+            await this.timeTrackerManager.deleteSubTimer(timerId, message.subtimerId);
+            const updatedTimer = this.findTimerById(timerId);
+            if (updatedTimer) {
+              this.sendTimerEditorState(updatedTimer);
+            }
+            this.timeTrackerTreeProvider?.refresh();
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to delete subtimer: ${messageText}`);
+          }
+          break;
+        case 'createSubTimer':
+          try {
+            const timer = this.findTimerById(timerId);
+            if (!timer) {
+              vscode.window.showErrorMessage('Timer not found');
+              break;
+            }
+            // Calculate next session number
+            const sessionNumber = timer.subtimers ? timer.subtimers.length + 1 : 1;
+            const label = `Session ${sessionNumber}`;
+            // Only start immediately if parent timer has running subtimers
+            const hasRunningSubtimer = timer.subtimers && timer.subtimers.some(st => !st.endTime);
+            await this.timeTrackerManager.createSubTimer(timerId, label, undefined, hasRunningSubtimer);
+            const updatedTimer = this.findTimerById(timerId);
+            if (updatedTimer) {
+              this.sendTimerEditorState(updatedTimer);
+            }
+            this.timeTrackerTreeProvider?.refresh();
+            vscode.window.showInformationMessage(`SubTimer "${label}" created`);
+          } catch (error) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to create subtimer: ${messageText}`);
+          }
+          break;
+        case 'cancel':
+          this.timerPanel?.dispose();
+          break;
+      }
+    });
+
+    this.timerPanel.onDidDispose(() => {
+      this.timerPanel = undefined;
+    });
+  }
+
+  private sendTimerEditorState(timer: Timer): void {
+    this.timerPanel?.webview.postMessage({
+      type: 'timerState',
+      timer: {
+        ...timer,
+        subtimers: timer.subtimers || []
+      }
+    });
+  }
+
+  private findTimerById(timerId: string): Timer | undefined {
+    const configManager = ConfigManager.getInstance();
+    const timeTrackerConfig = configManager.getTimeTrackerConfig();
+    
+    const findTimer = (folders: typeof timeTrackerConfig.folders): Timer | undefined => {
+      for (const folder of folders) {
+        for (const timer of folder.timers) {
+          if (timer.id === timerId) return timer;
+        }
+        if (folder.subfolders) {
+          const found = findTimer(folder.subfolders);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    
+    return findTimer(timeTrackerConfig.folders);
+  }
+
+  private async saveTimer(timer: Timer): Promise<void> {
+    await this.timeTrackerManager.editTimer(timer.id, {
+      label: timer.label,
+      archived: timer.archived
+    });
+  }
 
   private getNonce(): string {
     let text = '';

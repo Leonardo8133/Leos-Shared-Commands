@@ -1,16 +1,17 @@
 # Extension Architecture Documentation
 
-This document provides a comprehensive overview of the VS Code extension architecture, helping developers understand how the three main apps work, where they are implemented, and how to efficiently navigate the codebase.
+This document provides a comprehensive overview of the VS Code extension architecture, helping developers understand how the four main apps work, where they are implemented, and how to efficiently navigate the codebase.
 
 ## 🏗️ Overall Architecture
 
-The extension consists of **three independent apps** organized in separate folders, plus shared utilities. Each app is self-contained but may share common services.
+The extension consists of **four independent apps** organized in separate folders, plus shared utilities. Each app is self-contained but may share common services.
 
 ```
 ├── apps/
 │   ├── tasks/              # Tasks panel (command management)
 │   ├── testRunner/         # Test Runner panel
-│   └── documentation/      # Documentation Hub panel
+│   ├── documentation/      # Documentation Hub panel
+│   └── timeTracker/        # Time Tracker panel
 └── src/                    # Shared code and entry point
     ├── config/             # Configuration management
     ├── execution/          # Terminal execution
@@ -275,6 +276,167 @@ The Documentation Hub can extract shell commands from README code blocks and aut
 
 ---
 
+## ⏱️ App 4: Time Tracker Panel
+
+**Location:** `apps/timeTracker/`  
+**View ID:** `timeTrackerTree`  
+**Purpose:** Track time spent on tasks, branches, and projects with automatic Git branch integration
+
+### Implementation Files
+
+#### Core Components
+- **`apps/timeTracker/TimeTrackerManager.ts`**
+  - Singleton that manages all timer and subtimer logic
+  - Handles persistence, state management, and Git integration
+  - Manages automatic timer creation on branch checkout
+  - Tracks pause/resume with proper elapsed time calculation
+  - Key methods:
+    - `startTimer(label, folderPath?)` - Create and start a new timer
+    - `stopTimer(timerId)` - Pause all subtimers in a timer
+    - `stopAllTimers()` - Pause all running timers
+    - `resumeTimer(timerId)` - Resume timer by starting last session
+    - `createSubTimer(timerId, label, description?, startImmediately?)` - Create a new subtimer
+    - `startSubTimer(timerId, subtimerId)` - Resume a paused subtimer
+    - `stopSubTimer(timerId, subtimerId)` - Pause a running subtimer
+    - `editTimer(timerId, updates)` - Update timer properties
+    - `editSubTimer(timerId, subtimerId, updates)` - Update subtimer properties
+    - `deleteTimer(timerId)` - Delete a timer (archived only)
+    - `deleteSubTimer(timerId, subtimerId)` - Delete a subtimer
+    - `archiveTimer(timerId, archived)` - Archive/unarchive a timer
+    - `handleBranchCheckout(branchName)` - Handle Git branch changes
+    - `handleCommit(commitMessage)` - Handle Git commits
+    - `initializeGitWatcher()` - Watch for Git branch and commit changes
+    - `pauseAllTimersOnShutdown()` - Pause all timers when VS Code closes
+    - `resumeAutoPausedTimers()` - Resume timers on VS Code startup
+    - `getConfig()` - Get time tracker configuration
+    - `setEnabled(enabled)` - Enable/disable time tracking
+    - `setAutoCreateOnBranchCheckout(enabled)` - Enable/disable branch automation
+
+- **`apps/timeTracker/TimeTrackerTreeProvider.ts`**
+  - Implements `vscode.TreeDataProvider<TimeTrackerTreeItem>`
+  - Organizes timers by folders and special folders (Archived, Git Branches)
+  - Automatically expands running timers
+  - Refreshes every minute to update elapsed times
+  - Handles virtual "Archived" and "Git Branches" folders
+  - Methods:
+    - `getRootItems()` - Get root-level items (folders, special folders, root timers)
+    - `getFolderChildren(folderElement)` - Get timers and subfolders within a folder
+    - `getTimerChildren(timerElement)` - Get subtimers for a timer
+    - `refresh()` - Refresh the tree view
+
+- **`apps/timeTracker/TimeTrackerTreeItem.ts`**
+  - Represents items in time tracker tree
+  - Types: `folder`, `timer`, `subtimer`
+  - Manages display: icons, descriptions, tooltips
+  - Calculates elapsed time accounting for pauses
+  - Provides context values for menu item visibility
+  - Methods:
+    - `isFolder()` - Check if item is a folder
+    - `isTimer()` - Check if item is a timer
+    - `isSubTimer()` - Check if item is a subtimer
+    - `getTimer()` - Get timer object
+    - `getFolder()` - Get folder object
+    - `calculateSubtimerElapsedTime(subtimer)` - Calculate elapsed time excluding pause periods
+
+- **`apps/timeTracker/TimeTrackerStatusBar.ts`**
+  - Manages status bar item for active timer
+  - Displays first running timer label (truncated to 20 chars) and elapsed time
+  - Updates every 30 seconds
+  - Hides when no timers are running or feature is disabled
+
+### Key Features
+- **Manual Timer Creation** - Create timers with custom labels
+- **Subtimers (Sessions)** - Each timer has multiple subtimers/sessions
+- **Pause/Resume Support** - Proper elapsed time calculation excluding pause periods
+- **Git Branch Integration**:
+  - Automatically creates timers when checking out new branches
+  - Creates new sessions when switching between branches
+  - Renames sessions on commits with commit message
+  - Logs branch changes in both source and destination timers
+- **Special Folders**:
+  - **Archived** - Contains archived timers (read-only, special icon)
+  - **Git Branches** - Contains branch-automated timers (always visible, toggle button for automation)
+- **Timer Organization** - Organize timers into folders and subfolders
+- **Logs System** - Each timer maintains a log of all actions (start, pause, resume, edit, delete, branch changes, commits)
+- **Auto-expand Running Timers** - Running timers are automatically expanded in the tree
+- **Status Bar Integration** - Shows first running timer in status bar
+- **Enable/Disable Feature** - Global toggle to enable/disable time tracking
+- **Branch Automation Toggle** - Enable/disable automatic timer creation on branch checkout
+- **Persistence** - Timers are paused on VS Code close and can be resumed on startup
+- **Periodic Auto-save** - Saves timer state every 30 seconds
+
+### Configuration Structure (`TimeTrackerConfig`)
+```typescript
+{
+  folders: TimerFolder[];                    // Timer organization folders
+  ignoredBranches?: string[];                // Git branches to ignore (default: [])
+  autoCreateOnBranchCheckout?: boolean;      // Auto-create timers on branch checkout (default: true)
+  enabled?: boolean;                         // Enable/disable time tracking (default: true)
+}
+
+interface Timer {
+  id: string;
+  label: string;
+  startTime: string;                         // ISO timestamp (when timer was created)
+  branchName?: string;                       // Git branch name if auto-created
+  archived: boolean;
+  folderPath?: number[];                     // Path to folder in hierarchy
+  subtimers: SubTimer[];                     // Always at least 1 subtimer
+  logs?: string[];                           // Action logs
+}
+
+interface SubTimer {
+  id: string;
+  label: string;
+  description?: string;
+  startTime: string;                         // ISO timestamp (when subtimer was first created)
+  endTime?: string;                          // ISO timestamp (undefined if running)
+  totalElapsedTime?: number;                 // Total milliseconds elapsed (excluding pauses)
+  lastResumeTime?: string;                   // ISO timestamp of last resume
+}
+```
+
+### Commands (registered in `extension.ts`)
+- `timeTracker.startTimer` - Start a new timer
+- `timeTracker.stopTimer` - Stop/pause a timer
+- `timeTracker.stopAllTimers` - Stop all running timers
+- `timeTracker.resumeTimer` - Resume a stopped timer
+- `timeTracker.editTimer` - Edit timer properties (opens webview editor)
+- `timeTracker.deleteTimer` - Delete an archived timer
+- `timeTracker.archiveTimer` - Archive/unarchive a timer
+- `timeTracker.newFolder` - Create a new folder
+- `timeTracker.moveTimerUp` - Move timer up in list
+- `timeTracker.moveTimerDown` - Move timer down in list
+- `timeTracker.moveToFolder` - Move timer to a different folder
+- `timeTracker.createSubTimer` - Create a new subtimer
+- `timeTracker.startSubTimer` - Resume a paused subtimer
+- `timeTracker.stopSubTimer` - Pause a running subtimer
+- `timeTracker.editSubTimer` - Rename a subtimer
+- `timeTracker.deleteSubTimer` - Delete a subtimer
+- `timeTracker.refresh` - Refresh the tree view
+- `timeTracker.toggleEnabled` - Enable/disable time tracking
+- `timeTracker.toggleBranchAutomation` - Toggle branch automation (Git Branches folder)
+- `timeTracker.focusView` - Focus the time tracker view
+
+### Data Flow
+1. Extension activates → `TimeTrackerManager` initializes → `resumeAutoPausedTimers()` restores paused timers
+2. Git watcher initialized → Watches `.git/HEAD` and `.git/logs/HEAD` for changes
+3. Branch checkout detected → `handleBranchCheckout()` creates/resumes branch timer → Creates new session
+4. Commit detected → `handleCommit()` renames current session with commit message → Creates new session
+5. User creates timer → `startTimer()` → Creates timer with "Session 1" subtimer
+6. User pauses/resumes → Accumulates elapsed time in `totalElapsedTime` (excludes pause periods)
+7. VS Code closes → `pauseAllTimersOnShutdown()` pauses all timers → Stores IDs in workspace state
+8. VS Code opens → `resumeAutoPausedTimers()` resumes timers if paused within last 5 minutes
+9. Tree view refreshes → `TimeTrackerTreeProvider` calculates elapsed times → Updates display
+
+### Git Integration Details
+- **New Branch**: Creates timer "Branch: {name}", starts "Session 1", pauses other branch timers
+- **Existing Branch**: Pauses other branch timers, pauses last session, creates new session, resumes timer
+- **Commit**: Renames active session to "Session {n} - Commit: {message}", pauses it, creates new session
+- **Branch Switch Logging**: Logs switch in both source and destination branch timers
+
+---
+
 ## 🔧 Shared Components
 
 ### Configuration Management
@@ -340,6 +502,7 @@ Central type definitions:
 - `CommandConfig` - Main config structure
 - `Command`, `Folder` - Task structures
 - `TestRunnerConfig` - Test runner configuration
+- `Timer`, `SubTimer`, `TimerFolder`, `TimeTrackerConfig` - Time tracker structures
 - `ExecutionState`, `ExecutionResult` - Execution types
 - `VariablePreset`, `SharedVariable`, `SharedList` - Variable types
 
@@ -350,12 +513,14 @@ Central type definitions:
 **Location:** `src/extension.ts`
 
 The `activate()` function:
-1. Initializes shared managers (ConfigManager, CommandExecutor, WebviewManager)
-2. Creates tree providers for all three apps
+1. Initializes shared managers (ConfigManager, CommandExecutor, WebviewManager, TimeTrackerManager)
+2. Creates tree providers for all four apps
 3. Registers VS Code tree views
 4. Registers all commands
 5. Sets up editor decorations (for test runner)
 6. Connects dependencies (e.g., CommandExecutor → CommandTreeProvider)
+7. Initializes Git watcher for time tracker
+8. Resumes auto-paused timers from previous session
 
 ### View Registration
 Views are registered in `package.json`:
@@ -364,7 +529,8 @@ Views are registered in `package.json`:
   "command-manager": [
     { "id": "commandManagerTree", "name": "Tasks" },
     { "id": "documentationHubTree", "name": "Documentation Hub" },
-    { "id": "testRunnerTree", "name": "Test Runner" }
+    { "id": "testRunnerTree", "name": "Test Runner" },
+    { "id": "timeTrackerTree", "name": "Time Tracker" }
   ]
 }
 ```
@@ -384,7 +550,8 @@ Structure:
   "globalVariables": [ /* Variable presets */ ],
   "sharedVariables": [ /* Shared vars */ ],
   "sharedLists": [ /* Shared lists */ ],
-  "testRunners": [ /* Test runner configs */ ]
+  "testRunners": [ /* Test runner configs */ ],
+  "timeTracker": { /* Time tracker config */ }
 }
 ```
 
@@ -405,7 +572,7 @@ All apps share:
 - `ConfigManager` - Configuration persistence
 - `TerminalManager` - Command execution
 - `types.ts` - Type definitions
-- `WebviewManager` - UI panels (Tasks and Test Runner)
+- `WebviewManager` - UI panels (Tasks, Test Runner, and Time Tracker)
 
 ---
 
@@ -420,6 +587,8 @@ All apps share:
 | Test discovery | `apps/testRunner/TestRunnerManager.ts` |
 | Test tree view | `apps/testRunner/TestRunnerTreeProvider.ts` |
 | Documentation scanning | `apps/documentation/DocumentationTreeProvider.ts` |
+| Timer management | `apps/timeTracker/TimeTrackerManager.ts` |
+| Timer tree view | `apps/timeTracker/TimeTrackerTreeProvider.ts` |
 | Config persistence | `src/config/ConfigManager.ts` |
 | Terminal execution | `src/execution/TerminalManager.ts` |
 | Variable resolution | `src/variables/VariableResolver.ts` |
@@ -431,6 +600,7 @@ All apps share:
 - `ConfigManager.getInstance()`
 - `CommandExecutor.getInstance()`
 - `TestRunnerManager.getInstance()`
+- `TimeTrackerManager.getInstance()`
 - `WebviewManager.getInstance()`
 - `TerminalManager.getInstance()`
 - `VariableResolver.getInstance()`
@@ -457,6 +627,7 @@ context.subscriptions.push(command);
    - `apps/tasks/*` → `../../../src/*`
    - `apps/testRunner/*` → `../../src/*`
    - `apps/documentation/*` → `../../src/*`
+   - `apps/timeTracker/*` → `../../src/*`
 
 2. **Config Changes:** When config changes, call `ConfigManager.saveConfig()` → triggers watcher → providers refresh via callback
 

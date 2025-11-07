@@ -159,6 +159,13 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
     }
 
     if (element.itemType === 'folder') {
+      // Check if this folder has subfolders
+      const subfolders = this.getSubfolders(element.config, element.folderPath!);
+      if (subfolders.length > 0) {
+        // Return subfolders first, then files
+        const files = await this.getFiles(element.config, element.folderPath!);
+        return [...subfolders, ...files];
+      }
       return this.getFiles(element.config, element.folderPath!);
     }
 
@@ -291,8 +298,10 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
       return [new TestRunnerTreeItem('placeholder', config)];
     }
 
-    // Group tests by folder
+    // Group tests by folder and build hierarchical structure
     const folderMap = new Map<string, DiscoveredTest[]>();
+    const allFolderPaths = new Set<string>();
+    
     for (const test of cached) {
       const relativePath = vscode.workspace.asRelativePath(test.file, false);
       const pathParts = relativePath.split(/[/\\]/);
@@ -303,16 +312,39 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
         folderMap.set(folderPath, []);
       }
       folderMap.get(folderPath)!.push(test);
+      
+      // Build all parent folder paths
+      const parentPaths: string[] = [];
+      for (let i = 0; i < pathParts.length; i++) {
+        const parentPath = pathParts.slice(0, i + 1).join('/') || '.';
+        allFolderPaths.add(parentPath);
+      }
     }
 
-    const folders = Array.from(folderMap.keys()).sort()
+    // Build hierarchical folder structure - find top-level folders
+    const topLevelFolders = Array.from(allFolderPaths).filter(folderPath => {
+      // A folder is top-level if no other folder is its parent
+      if (folderPath === '.') {
+        return false; // Skip root
+      }
+      const pathParts = folderPath.split('/');
+      // Check if any part of this path (except the full path) exists as a folder
+      for (let i = 1; i < pathParts.length; i++) {
+        const parentPath = pathParts.slice(0, i).join('/');
+        if (allFolderPaths.has(parentPath) && parentPath !== folderPath) {
+          return false; // Has a parent folder
+        }
+      }
+      return true;
+    }).sort();
+
+    const folders = topLevelFolders
       .filter(folderPath => {
         if (!this.searchQuery) {
           return true;
         }
         // Match by folder name or if any child test/file matches
-        const folderName = folderPath === '.' ? 'Root' : folderPath.split('/').pop() || folderPath;
-        if (this.matchesSearchQuery(folderName) || this.matchesSearchQuery(folderPath)) {
+        if (this.matchesSearchQuery(folderPath)) {
           return true;
         }
         // Check if any child file or test matches
@@ -325,12 +357,13 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
       })
       .map(folderPath => {
         const item = new TestRunnerTreeItem('folder', config, undefined, undefined, folderPath);
-        const tests = folderMap.get(folderPath) || [];
-        const count = tests.length;
+        // Count all tests in this folder and subfolders
+        const count = this.countTestsInFolder(folderPath, folderMap, allFolderPaths);
         item.description = `${count} test${count !== 1 ? 's' : ''} found`;
         
-        // Calculate status from child tests
-        const status = this.calculateParentStatus(tests);
+        // Calculate status from all tests in this folder and subfolders
+        const allTests = this.getAllTestsInFolder(folderPath, folderMap, allFolderPaths);
+        const status = this.calculateParentStatus(allTests);
         if (status) {
           item.setStatus(status);
         } else {
@@ -344,6 +377,123 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
       });
 
     return folders;
+  }
+
+  private getSubfolders(config: TestRunnerConfig, parentFolderPath: string): TestRunnerTreeItem[] {
+    const cached = this.testsCache.get(config.id) ?? [];
+    const allFolderPaths = new Set<string>();
+    const folderMap = new Map<string, DiscoveredTest[]>();
+    
+    for (const test of cached) {
+      const relativePath = vscode.workspace.asRelativePath(test.file, false);
+      const pathParts = relativePath.split(/[/\\]/);
+      pathParts.pop();
+      const folderPath = pathParts.join('/') || '.';
+      
+      if (!folderMap.has(folderPath)) {
+        folderMap.set(folderPath, []);
+      }
+      folderMap.get(folderPath)!.push(test);
+      
+      // Build all parent folder paths
+      for (let i = 0; i < pathParts.length; i++) {
+        const path = pathParts.slice(0, i + 1).join('/') || '.';
+        allFolderPaths.add(path);
+      }
+    }
+
+    // Find direct child folders
+    const childFolders = Array.from(allFolderPaths).filter(folderPath => {
+      if (folderPath === parentFolderPath || folderPath === '.') {
+        return false;
+      }
+      // Check if this folder is a direct child of parentFolderPath
+      if (parentFolderPath === '.') {
+        // For root, direct children are those with no intermediate folders
+        const pathParts = folderPath.split('/');
+        return pathParts.length === 1;
+      }
+      // Check if folderPath starts with parentFolderPath + '/'
+      if (!folderPath.startsWith(parentFolderPath + '/')) {
+        return false;
+      }
+      // Check if it's a direct child (no intermediate segments)
+      const relativePath = folderPath.substring(parentFolderPath.length + 1);
+      return !relativePath.includes('/');
+    }).sort();
+
+    return childFolders
+      .filter(folderPath => {
+        if (!this.searchQuery) {
+          return true;
+        }
+        // Match by folder name or full path
+        if (this.matchesSearchQuery(folderPath)) {
+          return true;
+        }
+        // Check if any child matches
+        const tests = folderMap.get(folderPath) || [];
+        return tests.some(test => {
+          const relativePath = vscode.workspace.asRelativePath(test.file, false);
+          const fileName = relativePath.split(/[/\\]/).pop() || '';
+          return this.matchesSearchQuery(fileName) || this.matchesSearchQuery(test.label);
+        });
+      })
+      .map(folderPath => {
+        // Show relative path: parent/current
+        const parentParts = parentFolderPath === '.' ? [] : parentFolderPath.split('/');
+        const currentParts = folderPath.split('/');
+        const relativeParts = currentParts.slice(parentParts.length);
+        const displayPath = relativeParts.length > 0 
+          ? `${parentParts[parentParts.length - 1]}/${relativeParts.join('/')}`
+          : folderPath;
+        
+        const item = new TestRunnerTreeItem('folder', config, undefined, undefined, folderPath);
+        // Override label to show relative path
+        item.label = displayPath;
+        
+        const count = this.countTestsInFolder(folderPath, folderMap, allFolderPaths);
+        item.description = `${count} test${count !== 1 ? 's' : ''} found`;
+        
+        const allTests = this.getAllTestsInFolder(folderPath, folderMap, allFolderPaths);
+        const status = this.calculateParentStatus(allTests);
+        if (status) {
+          item.setStatus(status);
+        } else {
+          const cachedStatus = this.getParentStatus(config.id, 'folder', folderPath);
+          if (cachedStatus) {
+            item.setStatus(cachedStatus);
+          }
+        }
+        return item;
+      });
+  }
+
+  private countTestsInFolder(folderPath: string, folderMap: Map<string, DiscoveredTest[]>, allFolderPaths: Set<string>): number {
+    let count = 0;
+    // Count tests in this folder
+    count += folderMap.get(folderPath)?.length || 0;
+    // Count tests in all subfolders
+    for (const [path, tests] of folderMap.entries()) {
+      if (path !== folderPath && path.startsWith(folderPath + '/')) {
+        count += tests.length;
+      }
+    }
+    return count;
+  }
+
+  private getAllTestsInFolder(folderPath: string, folderMap: Map<string, DiscoveredTest[]>, allFolderPaths: Set<string>): DiscoveredTest[] {
+    const allTests: DiscoveredTest[] = [];
+    // Get tests in this folder
+    const tests = folderMap.get(folderPath) || [];
+    allTests.push(...tests);
+    // Get tests in all subfolders
+    for (const [path, pathTests] of folderMap.entries()) {
+      if (path !== folderPath && path.startsWith(folderPath + '/')) {
+        allTests.push(...pathTests);
+      }
+    }
+    return allTests;
   }
 
   private async getFiles(config: TestRunnerConfig, folderPath: string): Promise<TestRunnerTreeItem[]> {

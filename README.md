@@ -9,7 +9,7 @@
 
 </div>
 
-A productivity-focused VS Code extension that centralizes reusable commands, project documentation, and automated test execution into a single activity bar container. Streamline your workflow by managing tasks, browsing docs, and running tests all in one place.
+A productivity-focused VS Code extension that centralizes reusable commands, project documentation, automated test execution, and time tracking into a single activity bar container. Streamline your workflow by managing tasks, browsing docs, running tests, and tracking your time all in one place.
 
 ---
 
@@ -28,6 +28,12 @@ A productivity-focused VS Code extension that centralizes reusable commands, pro
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/Leonardo8133/Leos-Shared-Commands/master/resources/Readme.gif" alt="Tasks, Tests & Doc Hub Demo" width="800">
+</div>
+
+# Time Tracking
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/Leonardo8133/Leos-Shared-Commands/master/resources/TimeTracker.gif" alt="Time Tracker Demo" width="800">
 </div>
 
 # Pinning Commands to the Status Bar
@@ -70,6 +76,22 @@ Browse and navigate your project documentation with ease.
 - **Deep Linking** - Jump directly to specific sections within markdown files
 - **Hide/Unhide Controls** - Hide folders or files you don't need - state persists across reloads
 - **Folder Structure** - Navigate your documentation structure naturally
+
+### ⏱️ Time Tracker
+
+Track time spent on tasks, branches, and projects with automatic Git integration.
+
+- **Manual Timers** - Create timers with custom labels and organize them into folders
+- **Sessions (Subtimers)** - Each timer supports multiple sessions with pause/resume functionality
+- **Pause/Resume Support** - Accurate elapsed time calculation that excludes pause periods
+- **Git Branch Integration** - Automatically creates timers when checking out Git branches
+- **Commit Tracking** - Sessions are automatically renamed with commit messages
+- **Special Folders** - "Archived" folder for archived timers, "Git Branches" folder for branch timers
+- **Activity Logs** - Each timer maintains a log of all actions (start, pause, resume, edits, branch changes, commits)
+- **Status Bar Integration** - Shows the first running timer in the status bar with elapsed time
+- **Auto-expand Running Timers** - Running timers are automatically expanded in the tree view
+- **Enable/Disable Controls** - Global toggle to enable/disable time tracking, branch automation toggle
+- **Persistence** - Timers are paused on VS Code close and can be resumed on startup
 
 ---
 
@@ -180,6 +202,41 @@ Navigate your project documentation:
 - Deep link to specific sections
 - Persistent hide/unhide state
 
+### 5. Track Time
+
+Manage time tracking with manual and automatic timers:
+
+1. Open the **Time Tracker** tree within the same container
+2. **Manual Timers**:
+   - Click the **+** icon or use context menu to create a new timer
+   - Timers automatically start with "Session 1"
+   - Create additional sessions (subtimers) as needed
+   - Pause/resume sessions - elapsed time excludes pause periods
+3. **Git Branch Timers** (automatic):
+   - Enable branch automation in the "Git Branches" folder
+   - Timers are automatically created when checking out new branches
+   - New sessions are created when switching branches
+   - Sessions are renamed with commit messages on commits
+4. **Organize Timers**:
+   - Create folders to organize timers
+   - Move timers between folders
+   - Archive timers (moved to "Archived" folder)
+5. **Edit Timers**:
+   - Double-click a timer to open the edit page
+   - Edit timer label, archived status
+   - Manage subtimers (reorder, edit, delete, create new)
+   - View logs of all timer actions
+   - View subtimer intervals and elapsed times
+
+**Features:**
+- **Pause/Resume**: Accurate elapsed time tracking that excludes pause periods
+- **Session Management**: Multiple sessions per timer, only one session running at a time
+- **Branch Automation**: Automatic timer creation and session management for Git branches
+- **Activity Logs**: Complete history of all timer actions
+- **Status Bar**: First running timer shown in status bar with elapsed time
+- **Auto-expand**: Running timers automatically expanded in tree view
+- **Persistence**: Timers paused on VS Code close, can be resumed on startup
+
 
 ## ⚙️ Configuration
 
@@ -201,6 +258,63 @@ Customize your documentation browsing experience:
 
 - **View Mode**: Switch between tree and flat list view
 - **Position**: Display documentation above or below the command list
+
+### Time Tracker Settings
+
+Time tracker configuration is stored in `.vscode/commands.json`:
+
+```json
+{
+  "timeTracker": {
+    "folders": [
+      {
+        "name": "My Folder",
+        "timers": [
+          {
+            "id": "unique-id",
+            "label": "My Timer",
+            "startTime": "2024-01-01T00:00:00.000Z",
+            "archived": false,
+            "subtimers": [
+              {
+                "id": "subtimer-id",
+                "label": "Session 1:",
+                "startTime": "2024-01-01T00:00:00.000Z",
+                "endTime": "2024-01-01T01:00:00.000Z",
+                "totalElapsedTime": 3600000,
+                "lastResumeTime": "2024-01-01T00:00:00.000Z"
+              }
+            ],
+            "logs": [
+              "1:00:00 PM - Timer created",
+              "1:00:00 PM - VS Code opened and started",
+              "1:00:00 PM - [Session 1:] - Started"
+            ]
+          }
+        ],
+        "subfolders": []
+      }
+    ],
+    "ignoredBranches": [],
+    "autoCreateOnBranchCheckout": true,
+    "enabled": true
+  }
+}
+```
+
+**Key Features:**
+- **Timer Structure**: Each timer contains multiple subtimers (sessions)
+- **Elapsed Time**: `totalElapsedTime` tracks running time excluding pauses
+- **Pause/Resume**: `lastResumeTime` tracks when timer was last resumed
+- **Logs**: Each timer maintains a log of all actions
+- **Branch Timers**: Timers with `branchName` are shown in "Git Branches" folder
+- **Auto-save**: Timer state saved every 30 seconds
+
+**Git Integration:**
+- **New Branch**: Creates timer "Branch: {name}", starts "Session 1"
+- **Branch Switch**: Pauses other branch timers, creates new session
+- **Commit**: Renames active session with commit message, creates new session
+- **Branch Logging**: Logs branch switches in both source and destination timers
 
 ### Test Runner Settings
 

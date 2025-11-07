@@ -24,7 +24,7 @@ export class TestRunnerTreeItem extends vscode.TreeItem {
         : itemType === 'placeholder'
         ? (placeholderText || 'No tests matched the current filters')
       : itemType === 'folder'
-      ? (folderPath === '.' ? 'Root' : (folderPath || '').split('/').pop() || folderPath || '')
+      ? (folderPath === '.' ? 'Root' : folderPath || '')
       : itemType === 'file'
       ? (fileName || '')
       : itemType === 'testcase'

@@ -1,4 +1,4 @@
-import { CommandConfig, TestRunnerConfig } from '../types';
+import { CommandConfig, TestRunnerConfig, TimeTrackerConfig } from '../types';
 
 export function getDefaultTestRunnerConfig(): TestRunnerConfig {
   return {
@@ -72,6 +72,15 @@ export function getDefaultConfig(): CommandConfig {
         description: 'Common deployment targets'
       }
     ]
+  };
+}
+
+export function getDefaultTimeTrackerConfig(): TimeTrackerConfig {
+  return {
+    folders: [],
+    ignoredBranches: [],
+    autoCreateOnBranchCheckout: true,
+    enabled: true
   };
 }
 
@@ -184,6 +193,63 @@ export function validateConfig(config: any): { valid: boolean; errors: string[] 
         errors.push(`Test runner ${index} must have a run test command`);
       }
     });
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+export function validateTimeTrackerConfig(config: any): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!config || typeof config !== 'object') {
+    errors.push('Time tracker config must be an object');
+    return { valid: false, errors };
+  }
+
+  if (!Array.isArray(config.folders)) {
+    errors.push('Time tracker config must have a folders array');
+  } else {
+    const validateFolders = (folders: any[], path: string[] = []): void => {
+      folders.forEach((folder, index) => {
+        if (!folder || typeof folder !== 'object') {
+          errors.push(`Folder at ${[...path, index.toString()].join('/') || 'root'} must be an object`);
+          return;
+        }
+
+        if (typeof folder.name !== 'string') {
+          errors.push(`Folder at ${[...path, index.toString()].join('/') || 'root'} must have a name`);
+        }
+
+        if (!Array.isArray(folder.timers)) {
+          errors.push(`Folder at ${[...path, index.toString()].join('/') || 'root'} must have a timers array`);
+        } else {
+          folder.timers.forEach((timer: any, timerIndex: number) => {
+            if (!timer || typeof timer !== 'object') {
+              errors.push(`Timer at ${[...path, index.toString()].join('/')}/timers/${timerIndex} must be an object`);
+              return;
+            }
+
+            if (typeof timer.id !== 'string') {
+              errors.push(`Timer at ${[...path, index.toString()].join('/')}/timers/${timerIndex} must have an id`);
+            }
+
+            if (typeof timer.label !== 'string') {
+              errors.push(`Timer at ${[...path, index.toString()].join('/')}/timers/${timerIndex} must have a label`);
+            }
+
+            if (!Array.isArray(timer.subtimers)) {
+              errors.push(`Timer at ${[...path, index.toString()].join('/')}/timers/${timerIndex} must have a subtimers array`);
+            }
+          });
+        }
+
+        if (Array.isArray(folder.subfolders)) {
+          validateFolders(folder.subfolders, [...path, index.toString()]);
+        }
+      });
+    };
+
+    validateFolders(config.folders);
   }
 
   return { valid: errors.length === 0, errors };

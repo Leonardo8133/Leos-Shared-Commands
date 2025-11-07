@@ -200,10 +200,14 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
 
       for (const folder of sortedFolders) {
         const children = [...buildItems(folder), ...folder.files.map(file => this.createFileItem(file))];
+        const collapsibleState = this.searchQuery
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed;
+
         const item = new DocumentationTreeItem(
           'folder',
           folder.name,
-          vscode.TreeItemCollapsibleState.Collapsed,
+          collapsibleState,
           undefined,
           children,
           folder.path
@@ -304,7 +308,28 @@ export class DocumentationTreeProvider implements vscode.TreeDataProvider<Docume
   }
 
   public async openFile(uri: vscode.Uri): Promise<void> {
-    await vscode.window.showTextDocument(uri, { preview: false });
+    const document = await vscode.workspace.openTextDocument(uri);
+    const editor = await vscode.window.showTextDocument(document, { preview: false });
+
+    const query = this.searchQuery.trim();
+    if (!query) {
+      return;
+    }
+
+    const text = document.getText();
+    const matchIndex = text.toLowerCase().indexOf(query.toLowerCase());
+    if (matchIndex === -1) {
+      return;
+    }
+
+    const startPosition = document.positionAt(matchIndex);
+    const endPosition = document.positionAt(matchIndex + query.length);
+    const range = new vscode.Range(startPosition, endPosition);
+
+    editor.selection = new vscode.Selection(range.start, range.end);
+    editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+
+    await vscode.commands.executeCommand('actions.findWithSelection');
   }
 
   public async openSection(target: { path: string; line: number }): Promise<void> {

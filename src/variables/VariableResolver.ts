@@ -42,6 +42,20 @@ export class VariableResolver {
     return Array.from(placeholders);
   }
 
+  private extractInputHelpText(commandText: string): string | undefined {
+    const regex = /\$(?:\{)?input(?::helptext=(?:"([^"]*)"|'([^']*)'))?(?:\})?/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(commandText)) !== null) {
+      const helpText = match[1] ?? match[2];
+      if (helpText) {
+        return helpText;
+      }
+    }
+
+    return undefined;
+  }
+
   public getAvailableVariables(): VariableMetadata[] {
     const config = this.configManager.getConfig();
     const variables: VariableMetadata[] = [];
@@ -75,6 +89,8 @@ export class VariableResolver {
       return [];
     }
 
+    const inputHelpText = this.extractInputHelpText(command.command);
+
     const config = this.configManager.getConfig();
     const variableMap = new Map((config.sharedVariables || []).map(v => [v.key, v] as const));
     const listMap = new Map((config.sharedLists || []).map(l => [l.key, l] as const));
@@ -90,8 +106,10 @@ export class VariableResolver {
       // Handle manual input variable
       if (key === 'input') {
         const userInput = await vscode.window.showInputBox({
-          prompt: 'Enter input for the command',
-          placeHolder: 'Type your input here (can be empty)',
+          prompt: inputHelpText
+            ? 'Tip: add $input:helptext="Your text" to commands to show custom guidance.'
+            : 'Enter input for the command',
+          placeHolder: inputHelpText || 'Type your input here (can be empty)',
           value: ''
         });
 

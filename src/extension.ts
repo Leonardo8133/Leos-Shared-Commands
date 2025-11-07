@@ -12,6 +12,11 @@ import { TestRunnerTreeProvider } from '../apps/testRunner/TestRunnerTreeProvide
 import { TestRunnerTreeItem } from '../apps/testRunner/TestRunnerTreeItem';
 import { TestRunnerCodeLensProvider } from '../apps/testRunner/TestRunnerCodeLensProvider';
 import { DiscoveredTest, TestRunnerManager } from '../apps/testRunner/TestRunnerManager';
+import { TimeTrackerManager } from '../apps/timeTracker/TimeTrackerManager';
+import { TimeTrackerTreeProvider } from '../apps/timeTracker/TimeTrackerTreeProvider';
+import { TimeTrackerTreeItem } from '../apps/timeTracker/TimeTrackerTreeItem';
+import { TimeTrackerStatusBar } from '../apps/timeTracker/TimeTrackerStatusBar';
+import { Timer, SubTimer } from './types';
 
 type DocumentationPosition = 'top' | 'bottom';
 
@@ -65,6 +70,166 @@ export async function activate(context: vscode.ExtensionContext) {
         showCollapseAll: true
     });
 
+    const timeTrackerManager = TimeTrackerManager.getInstance();
+    timeTrackerManager.setWorkspaceState(context.workspaceState);
+    const timeTrackerProvider = new TimeTrackerTreeProvider();
+    const timeTrackerTreeView = vscode.window.createTreeView('timeTrackerTree', {
+        treeDataProvider: timeTrackerProvider,
+        showCollapseAll: true
+    });
+
+    // Handle double-click on timer to open edit page
+    let lastClickItem: { id: string; time: number } | null = null;
+    timeTrackerTreeView.onDidChangeSelection(async (e) => {
+        if (e.selection.length > 0) {
+            const item = e.selection[0];
+            if (item.isTimer()) {
+                const timer = item.getTimer();
+                if (timer && item.id) {
+                    const now = Date.now();
+                    // Check if this is a double-click (same item clicked within 300ms)
+                    if (lastClickItem && lastClickItem.id === item.id && (now - lastClickItem.time) < 300) {
+                        webviewManager.showTimerEditor(timer.id);
+                        lastClickItem = null; // Reset to prevent triple-click
+                    } else {
+                        lastClickItem = { id: item.id, time: now };
+                    }
+                }
+            }
+        }
+    });
+
+    // Detect unexpected shutdown gaps before resuming timers
+    await timeTrackerManager.detectUnexpectedShutdown();
+
+    // Resume auto-paused timers from previous session
+    await timeTrackerManager.resumeAutoPausedTimers();
+
+    // Persist initial elapsed-time snapshot immediately on startup
+    await timeTrackerManager.saveTimersPeriodically();
+
+    // Initialize git watcher for time tracker
+    await timeTrackerManager.initializeGitWatcher();
+
+    // Periodic save to ensure timers are saved even if deactivate isn't called
+    const periodicSave = setInterval(async () => {
+        try {
+            await timeTrackerManager.saveTimersPeriodically();
+        } catch (error) {
+            // Silently fail - periodic save shouldn't interrupt user
+        }
+    }, 30000); // Save every 30 seconds
+    context.subscriptions.push({ dispose: () => clearInterval(periodicSave) });
+
+    // Try to catch process exit events (if available in extension host)
+    // This is a fallback in case deactivate() isn't called
+    if (typeof process !== 'undefined' && process.on) {
+        const processExitHandler = async () => {
+            try {
+                await timeTrackerManager.pauseAllTimersOnShutdown();
+            } catch (error) {
+                // Silently fail - process is exiting
+            }
+        };
+        
+        process.on('beforeExit', processExitHandler);
+        process.on('SIGINT', processExitHandler);
+        process.on('SIGTERM', processExitHandler);
+        
+        context.subscriptions.push({
+            dispose: () => {
+                if (typeof process !== 'undefined' && process.removeListener) {
+                    process.removeListener('beforeExit', processExitHandler);
+                    process.removeListener('SIGINT', processExitHandler);
+                    process.removeListener('SIGTERM', processExitHandler);
+                }
+            }
+        });
+    }
+
+    // Initialize time tracker status bar
+    const timeTrackerStatusBar = new TimeTrackerStatusBar(context);
+    context.subscriptions.push(timeTrackerStatusBar);
+    
+    // Function to expand running timers
+    const expandRunningTimers = async () => {
+        try {
+            const config = timeTrackerManager.getConfig();
+            const runningTimers: Timer[] = [];
+            
+            // Collect all running timers
+            const findRunningTimers = (folders: any[]) => {
+                for (const folder of folders) {
+                    for (const timer of folder.timers) {
+                        const hasRunningSubtimer = timer.subtimers && timer.subtimers.some((st: SubTimer) => !st.endTime);
+                        if (hasRunningSubtimer) {
+                            runningTimers.push(timer);
+                        }
+                    }
+                    if (folder.subfolders) {
+                        findRunningTimers(folder.subfolders);
+                    }
+                }
+            };
+            findRunningTimers(config.folders || []);
+            
+            // Expand each running timer
+            for (const timer of runningTimers) {
+                try {
+                    // Get root items
+                    const rootItems = await timeTrackerProvider.getChildren(undefined);
+                    
+                    // Search for the timer item recursively
+                    const findTimerItem = async (items: TimeTrackerTreeItem[]): Promise<TimeTrackerTreeItem | null> => {
+                        for (const item of items) {
+                            if (item.isTimer()) {
+                                const itemTimer = item.getTimer();
+                                if (itemTimer && itemTimer.id === timer.id) {
+                                    return item;
+                                }
+                            }
+                            if (item.isFolder()) {
+                                const children = await timeTrackerProvider.getChildren(item);
+                                const found = await findTimerItem(children);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    };
+                    
+                    const timerItem = await findTimerItem(rootItems);
+                    if (timerItem) {
+                        await timeTrackerTreeView.reveal(timerItem, { expand: true, select: false, focus: false });
+                    }
+                } catch (error) {
+                    // Item might not be visible yet, ignore
+                }
+            }
+        } catch (error) {
+            // Ignore errors during expansion
+        }
+    };
+    
+    // Update status bar when tree refreshes and expand running timers
+    const originalRefresh = timeTrackerProvider.refresh.bind(timeTrackerProvider);
+    timeTrackerProvider.refresh = () => {
+        originalRefresh();
+        timeTrackerStatusBar.update();
+        // Expand running timers after a short delay to ensure tree is updated
+        setTimeout(() => {
+            expandRunningTimers().catch(() => {
+                // Ignore errors
+            });
+        }, 100);
+    };
+    
+    // Initially expand running timers after tree is ready
+    setTimeout(() => {
+        expandRunningTimers().catch(() => {
+            // Ignore errors
+        });
+    }, 500);
+
     // Discover tests for configs with autoFind enabled on extension load
     const configs = testRunnerManager.getConfigs().filter(c => c.activated && c.autoFind !== false);
     for (const config of configs) {
@@ -86,9 +251,10 @@ export async function activate(context: vscode.ExtensionContext) {
     commandExecutor.setWebviewManager(webviewManager);
     webviewManager.setTreeProvider(treeProvider);
     webviewManager.setTestRunnerTreeProvider(testRunnerProvider);
+    webviewManager.setTimeTrackerTreeProvider(timeTrackerProvider);
 
     const statusBarManager = new StatusBarManager(context, treeProvider, configManager);
-    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView, testRunnerProvider, testRunnerTreeView, codeLensProvider, codeLensRegistration);
+    context.subscriptions.push(statusBarManager, documentationProvider, documentationTreeView, commandTreeView, testRunnerProvider, testRunnerTreeView, timeTrackerTreeView, codeLensProvider, codeLensRegistration);
 
     // Editor decorations for test status
     const decorationTypes = {
@@ -884,27 +1050,38 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     );
 
-    const expandAllTestRunners = vscode.commands.registerCommand('testRunner.expandAll', async () => {
-        const configs = testRunnerManager.getConfigs();
-        for (const config of configs) {
-            const configItem = new TestRunnerTreeItem('config', config);
-            try {
-                await testRunnerTreeView.reveal(configItem, { expand: true, focus: false });
-            } catch (error) {
-                // Item might not be visible yet, continue with next
+    const expandAllTestRunners = vscode.commands.registerCommand('testRunner.expandAll', async (item?: TestRunnerTreeItem) => {
+        if (item) {
+            // Expand specific item and all its children recursively (up to 3 levels)
+            await testRunnerTreeView.reveal(item, { expand: 3, focus: false });
+        } else {
+            // Expand all configs
+            const configs = testRunnerManager.getConfigs();
+            for (const config of configs) {
+                const configItem = new TestRunnerTreeItem('config', config);
+                try {
+                    await testRunnerTreeView.reveal(configItem, { expand: 3, focus: false });
+                } catch (error) {
+                    // Item might not be visible yet, continue with next
+                }
             }
         }
     });
 
-    const collapseAllTestRunners = vscode.commands.registerCommand('testRunner.collapseAll', async () => {
-        // Refresh the tree view - this will rebuild all items with their default collapsed state
-        // Note: VS Code preserves expansion state, so we need to force a refresh
-        testRunnerProvider.refresh();
-        
-        // Force refresh by waiting and refreshing again to ensure state is reset
-        setTimeout(() => {
+    const collapseAllTestRunners = vscode.commands.registerCommand('testRunner.collapseAll', async (item?: TestRunnerTreeItem) => {
+        if (item) {
+            // Collapse specific item - refresh it to reset its state
+            testRunnerProvider.refresh(item);
+            setTimeout(() => {
+                testRunnerProvider.refresh(item);
+            }, 50);
+        } else {
+            // Collapse all - refresh the entire tree
             testRunnerProvider.refresh();
-        }, 50);
+            setTimeout(() => {
+                testRunnerProvider.refresh();
+            }, 50);
+        }
     });
 
     const refreshTestRunners = vscode.commands.registerCommand('testRunner.refresh', async () => {
@@ -1008,6 +1185,322 @@ export async function activate(context: vscode.ExtensionContext) {
         documentationProvider.unhideAll();
     });
 
+    // Time Tracker commands
+    const startTimerCommand = vscode.commands.registerCommand('timeTracker.startTimer', async (item?: TimeTrackerTreeItem) => {
+        const label = await vscode.window.showInputBox({
+            prompt: 'Enter timer label',
+            placeHolder: 'Timer name'
+        });
+        if (label === undefined) return;
+
+        const folderPath = item && item.isFolder() ? item.getFolderPath() : undefined;
+        await timeTrackerManager.startTimer(label, folderPath);
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+        vscode.window.showInformationMessage(`Timer "${label}" started`);
+    });
+
+    const stopTimerCommand = vscode.commands.registerCommand('timeTracker.stopTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+        // Check if timer has any running subtimers
+        const hasRunningSubtimer = timer.subtimers && timer.subtimers.some(st => !st.endTime);
+        if (!hasRunningSubtimer) return;
+
+        await timeTrackerManager.stopTimer(timer.id);
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+        vscode.window.showInformationMessage(`Timer "${timer.label}" stopped`);
+    });
+
+    const stopAllTimersCommand = vscode.commands.registerCommand('timeTracker.stopAll', async () => {
+        await timeTrackerManager.stopAllTimers();
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+        vscode.window.showInformationMessage('All timers stopped');
+    });
+
+    const editTimerCommand = vscode.commands.registerCommand('timeTracker.editTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+
+        webviewManager.showTimerEditor(timer.id);
+    });
+
+    const deleteTimerCommand = vscode.commands.registerCommand('timeTracker.deleteTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+
+        const confirmed = await vscode.window.showWarningMessage(
+            `Delete timer "${timer.label}"?`,
+            { modal: true },
+            'Delete'
+        );
+        if (confirmed !== 'Delete') return;
+
+        await timeTrackerManager.deleteTimer(timer.id);
+        timeTrackerProvider.refresh();
+        vscode.window.showInformationMessage('Timer deleted');
+    });
+
+    const archiveTimerCommand = vscode.commands.registerCommand('timeTracker.archiveTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+
+        const wasArchived = timer.archived;
+        await timeTrackerManager.archiveTimer(timer.id, !timer.archived);
+        timeTrackerProvider.refresh();
+        vscode.window.showInformationMessage(wasArchived ? 'Timer unarchived' : 'Timer archived');
+    });
+
+    const newFolderCommand = vscode.commands.registerCommand('timeTracker.newFolder', async (item?: TimeTrackerTreeItem) => {
+        const name = await vscode.window.showInputBox({
+            prompt: 'Enter folder name',
+            placeHolder: 'Folder name'
+        });
+        if (!name) return;
+
+        const parentPath = item && item.isFolder() ? item.getFolderPath() : undefined;
+        await timeTrackerManager.createFolder(name, parentPath);
+        timeTrackerProvider.refresh();
+    });
+
+    const moveTimerToFolderCommand = vscode.commands.registerCommand('timeTracker.moveToFolder', async (timerItem: TimeTrackerTreeItem, folderItem?: TimeTrackerTreeItem) => {
+        if (!timerItem || !timerItem.isTimer()) return;
+        const timer = timerItem.getTimer();
+        if (!timer) return;
+
+        // If folderItem is provided, use it; otherwise show quick pick
+        if (folderItem && folderItem.isFolder()) {
+            const folderPath = folderItem.getFolderPath();
+            await timeTrackerManager.moveTimerToFolder(timer.id, folderPath);
+            timeTrackerProvider.refresh();
+        } else {
+            // Show quick pick to select folder
+            const configManager = ConfigManager.getInstance();
+            const config = configManager.getTimeTrackerConfig();
+            
+            const folderOptions: Array<{ label: string; path?: number[]; description?: string }> = [
+                { label: '$(folder-opened) Root Level', description: 'No category', path: undefined }
+            ];
+
+            const collectFolders = (folders: typeof config.folders, parentPath: number[] = [], prefix: string = ''): void => {
+                folders.forEach((folder, index) => {
+                    if (folder.name) { // Skip root folder (empty name)
+                        const path = [...parentPath, index];
+                        folderOptions.push({
+                            label: `${prefix}${folder.name}`,
+                            path: path,
+                            description: `Path: ${path.join(' > ')}`
+                        });
+                        if (folder.subfolders) {
+                            collectFolders(folder.subfolders, path, `${prefix}  `);
+                        }
+                    }
+                });
+            };
+            collectFolders(config.folders);
+
+            const selection = await vscode.window.showQuickPick(folderOptions, {
+                placeHolder: 'Select folder for timer'
+            });
+
+            if (selection) {
+                await timeTrackerManager.moveTimerToFolder(timer.id, selection.path);
+                timeTrackerProvider.refresh();
+            }
+        }
+    });
+
+    const resumeTimerCommand = vscode.commands.registerCommand('timeTracker.resumeTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+        // Check if timer has any running subtimers (if so, it's already running)
+        const hasRunningSubtimer = timer.subtimers && timer.subtimers.some(st => !st.endTime);
+        if (hasRunningSubtimer) return; // Can only resume stopped timers
+
+        // Resume the timer (start the last subtimer)
+        await timeTrackerManager.resumeTimer(timer.id);
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+        vscode.window.showInformationMessage(`Timer "${timer.label}" resumed`);
+    });
+
+    const moveTimerUpCommand = vscode.commands.registerCommand('timeTracker.moveTimerUp', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+
+        await timeTrackerManager.moveTimerByOffset(timer.id, -1);
+        timeTrackerProvider.refresh();
+    });
+
+    const moveTimerDownCommand = vscode.commands.registerCommand('timeTracker.moveTimerDown', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+
+        await timeTrackerManager.moveTimerByOffset(timer.id, 1);
+        timeTrackerProvider.refresh();
+    });
+
+    const createSubTimerCommand = vscode.commands.registerCommand('timeTracker.createSubTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isTimer()) return;
+        const timer = item.getTimer();
+        if (!timer) return;
+
+        // Calculate next session number
+        const sessionNumber = timer.subtimers ? timer.subtimers.length + 1 : 1;
+        const label = `Session ${sessionNumber}`;
+
+        try {
+            // Only start immediately if parent timer is running (has running subtimers)
+            const hasRunningSubtimer = timer.subtimers && timer.subtimers.some(st => !st.endTime);
+            const startImmediately = hasRunningSubtimer;
+            await timeTrackerManager.createSubTimer(timer.id, label, undefined, startImmediately);
+            timeTrackerProvider.refresh();
+            timeTrackerStatusBar.update();
+            if (startImmediately) {
+                vscode.window.showInformationMessage(`SubTimer "${label}" created and started`);
+            } else {
+                vscode.window.showInformationMessage(`SubTimer "${label}" created`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to create subtimer: ${error}`);
+        }
+    });
+
+    const startSubTimerCommand = vscode.commands.registerCommand('timeTracker.startSubTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isSubTimer()) return;
+        const subtimer = item.getSubTimer();
+        if (!subtimer) return;
+
+        const parentTimer = item.parent?.getTimer();
+        if (!parentTimer) return;
+
+        await timeTrackerManager.startSubTimer(parentTimer.id, subtimer.id);
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+        vscode.window.showInformationMessage(`SubTimer "${subtimer.label}" started`);
+    });
+
+    const stopSubTimerCommand = vscode.commands.registerCommand('timeTracker.stopSubTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isSubTimer()) return;
+        const subtimer = item.getSubTimer();
+        if (!subtimer || subtimer.endTime) return;
+
+        const parentTimer = item.parent?.getTimer();
+        if (!parentTimer) return;
+
+        await timeTrackerManager.stopSubTimer(parentTimer.id, subtimer.id);
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+        vscode.window.showInformationMessage(`SubTimer "${subtimer.label}" stopped`);
+    });
+
+    const editSubTimerCommand = vscode.commands.registerCommand('timeTracker.editSubTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isSubTimer()) return;
+        const subtimer = item.getSubTimer();
+        if (!subtimer) return;
+
+        const parentTimer = item.parent?.getTimer();
+        if (!parentTimer) return;
+
+        const newLabel = await vscode.window.showInputBox({
+            prompt: 'Enter new subtimer label',
+            value: subtimer.label
+        });
+        if (newLabel === undefined) return;
+
+        const newDescription = await vscode.window.showInputBox({
+            prompt: 'Enter new subtimer description (optional)',
+            value: subtimer.description || ''
+        });
+
+        const updates: Partial<typeof subtimer> = {};
+        if (newLabel !== subtimer.label) {
+            updates.label = newLabel;
+        }
+        if (newDescription !== (subtimer.description || '')) {
+            updates.description = newDescription || undefined;
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await timeTrackerManager.editSubTimer(parentTimer.id, subtimer.id, updates);
+            timeTrackerProvider.refresh();
+        }
+    });
+
+    const deleteSubTimerCommand = vscode.commands.registerCommand('timeTracker.deleteSubTimer', async (item: TimeTrackerTreeItem) => {
+        if (!item || !item.isSubTimer()) return;
+        const subtimer = item.getSubTimer();
+        if (!subtimer) return;
+
+        const parentTimer = item.parent?.getTimer();
+        if (!parentTimer) return;
+
+        const confirmed = await vscode.window.showWarningMessage(
+            `Delete subtimer "${subtimer.label}"?`,
+            { modal: true },
+            'Delete'
+        );
+        if (confirmed !== 'Delete') return;
+
+        await timeTrackerManager.deleteSubTimer(parentTimer.id, subtimer.id);
+        timeTrackerProvider.refresh();
+        vscode.window.showInformationMessage('SubTimer deleted');
+    });
+
+    const refreshTimeTrackerCommand = vscode.commands.registerCommand('timeTracker.refresh', () => {
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+    });
+
+    const toggleEnabledCommand = vscode.commands.registerCommand('timeTracker.toggleEnabled', async () => {
+        const isEnabled = timeTrackerManager.isEnabled();
+        await timeTrackerManager.setEnabled(!isEnabled);
+        timeTrackerProvider.refresh();
+        timeTrackerStatusBar.update();
+        vscode.window.showInformationMessage(`Time tracking ${!isEnabled ? 'enabled' : 'disabled'}`);
+    });
+
+    const toggleBranchAutomationCommand = vscode.commands.registerCommand('timeTracker.toggleBranchAutomation', async () => {
+        const isEnabled = timeTrackerManager.isAutoCreateOnBranchCheckoutEnabled();
+        await timeTrackerManager.setAutoCreateOnBranchCheckout(!isEnabled);
+        timeTrackerProvider.refresh();
+        vscode.window.showInformationMessage(`Branch automation ${!isEnabled ? 'enabled' : 'disabled'}`);
+    });
+
+    const focusViewCommand = vscode.commands.registerCommand('timeTracker.focusView', () => {
+        timeTrackerTreeView.reveal(timeTrackerTreeView.selection[0] || null, { focus: true, select: false });
+    });
+
+    context.subscriptions.push(
+        toggleBranchAutomationCommand,
+        startTimerCommand,
+        stopTimerCommand,
+        stopAllTimersCommand,
+        editTimerCommand,
+        deleteTimerCommand,
+        archiveTimerCommand,
+        resumeTimerCommand,
+        moveTimerUpCommand,
+        moveTimerDownCommand,
+        moveTimerToFolderCommand,
+        newFolderCommand,
+        createSubTimerCommand,
+        startSubTimerCommand,
+        stopSubTimerCommand,
+        editSubTimerCommand,
+        deleteSubTimerCommand,
+        refreshTimeTrackerCommand
+    );
+
     context.subscriptions.push(
         openDocumentation,
         copyDocumentationPath,
@@ -1025,8 +1518,22 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('Task and Documentation Hub extension activated! Use Ctrl+Shift+C for quick access.');
 }
 
-export function deactivate() {
+export async function deactivate() {
+    try {
+        // Pause all running timers and subtimers before shutdown
+        const timeTrackerManager = TimeTrackerManager.getInstance();
+        await timeTrackerManager.pauseAllTimersOnShutdown();
+    } catch (error) {
+        // Silently fail - extension is shutting down
+        console.error('Error pausing timers on shutdown:', error);
+    }
+    
     // Clean up resources
-    const configManager = ConfigManager.getInstance();
-    configManager.dispose();
+    try {
+        const configManager = ConfigManager.getInstance();
+        configManager.dispose();
+    } catch (error) {
+        // Silently fail - extension is shutting down
+        console.error('Error disposing config manager:', error);
+    }
 }
