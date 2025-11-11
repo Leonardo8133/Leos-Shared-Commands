@@ -1323,8 +1323,15 @@ class PythonPattern extends BasePattern implements LanguagePattern {
       let qualified = method;
       const containing = classDefs
         .filter(c => c.lineIdx < i && methodIndent > c.indent)
-        .sort((a, b) => b.indent - a.indent);
-      if (containing.length > 0) qualified = `${containing[0].name}.${method}`;
+        .sort((a, b) => {
+          if (b.indent !== a.indent) {
+            return b.indent - a.indent;
+          }
+          return b.lineIdx - a.lineIdx;
+        });
+      if (containing.length > 0) {
+        qualified = `${containing[0].name}.${method}`;
+      }
 
       if (!this.matchesAny(qualified, testNamePatterns)) continue;
       // Check ignore patterns against both test name and file/folder path

@@ -101,8 +101,21 @@ export class CommandTreeItem extends vscode.TreeItem {
       return command.terminal.type;
     } else {
       const folder = this.item as Folder;
-      return `${folder.commands.length} commands`;
+      const totalCommands = this.countCommands(folder);
+      const label = totalCommands === 1 ? 'command' : 'commands';
+      return `${totalCommands} ${label}`;
     }
+  }
+
+  private countCommands(folder: Folder): number {
+    const directCommands = Array.isArray(folder.commands) ? folder.commands.length : 0;
+    if (!folder.subfolders || folder.subfolders.length === 0) {
+      return directCommands;
+    }
+
+    return directCommands + folder.subfolders.reduce((sum, subfolder) => {
+      return sum + this.countCommands(subfolder);
+    }, 0);
   }
 
   public getCommand(): Command | undefined {

@@ -5,7 +5,8 @@ export enum DebugTag {
   TERMINAL = '[ Terminal ]',
   VARIABLE = '[ Variable ]',
   MOVE = '[ Move ]',
-  RESOLVER = '[ Resolver ]'
+  RESOLVER = '[ Resolver ]',
+  TEST_RUNNER = '[ TestRunner ]'
 }
 
 export class DebugLogger {
@@ -20,6 +21,10 @@ export class DebugLogger {
 
   public static setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    if (enabled) {
+      this.initialize();
+      this.outputChannel?.show(true);
+    }
   }
 
   public static log(tag: DebugTag, message: string, details?: any): void {

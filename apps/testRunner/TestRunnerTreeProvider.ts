@@ -1,3 +1,4 @@
+import { DebugLogger, DebugTag } from '../../src/utils/DebugLogger';
 import * as vscode from 'vscode';
 import { TestRunnerConfig } from '../../src/types';
 import { DiscoveredTest, TestRunnerManager } from './TestRunnerManager';
@@ -250,21 +251,73 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
     this.refresh();
   }
 
-  private matchesSearchQuery(text: string): boolean {
+  private matchesSearchQuery(text: string | undefined): boolean {
     if (!this.searchQuery) {
       return true;
+    }
+    if (!text) {
+      return false;
     }
     return text.toLowerCase().includes(this.searchQuery.toLowerCase());
   }
 
+  private testMatchesSearch(test: DiscoveredTest): boolean {
+    if (!this.searchQuery) {
+      return true;
+    }
+
+    if (this.matchesSearchQuery(test.label)) {
+      return true;
+    }
+
+    const labelParts = test.label.split('.');
+    if (labelParts.some(part => this.matchesSearchQuery(part))) {
+      return true;
+    }
+
+    const relativePath = vscode.workspace.asRelativePath(test.file, false).replace(/\\/g, '/');
+    if (this.matchesSearchQuery(relativePath)) {
+      return true;
+    }
+
+    const fileName = relativePath.split('/').pop() || '';
+    if (this.matchesSearchQuery(fileName)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private configMatchesSearch(config: TestRunnerConfig): boolean {
+    if (!this.searchQuery) {
+      return true;
+    }
+
+    if (this.matchesSearchQuery(config.title) || this.matchesSearchQuery(config.id) || this.matchesSearchQuery(config.fileType)) {
+      return true;
+    }
+
+    const tests = this.testsCache.get(config.id) ?? [];
+    return tests.some(test => this.testMatchesSearch(test));
+  }
+
   private async getConfigItems(): Promise<TestRunnerTreeItem[]> {
     const configs = this.manager.getConfigs();
-    const filtered = configs.filter(config => {
-      if (!this.searchQuery) {
-        return true;
-      }
-      // Match by config title or file type
-      return this.matchesSearchQuery(config.title) || this.matchesSearchQuery(config.fileType);
+    DebugLogger.log(DebugTag.TEST_RUNNER, 'TreeProvider.getConfigItems.start', {
+      configCount: configs.length,
+      hasSearchQuery: !!this.searchQuery,
+      searchQuery: this.searchQuery
+    });
+
+    if (this.searchQuery) {
+      // Ensure tests are loaded so search can match against cached results
+      await Promise.all(configs.map(config => this.ensureTestsCached(config)));
+    }
+
+    const filtered = configs.filter(config => this.configMatchesSearch(config));
+    DebugLogger.log(DebugTag.TEST_RUNNER, 'TreeProvider.getConfigItems.filtered', {
+      filteredCount: filtered.length,
+      searchQuery: this.searchQuery
     });
     
     return filtered.map(config => {
@@ -279,6 +332,26 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
         item.description = `${baseDesc} • ${count} test${count !== 1 ? 's' : ''} found`;
       }
       return item;
+    });
+  }
+
+  private async ensureTestsCached(config: TestRunnerConfig): Promise<void> {
+    if (this.testsCache.has(config.id)) {
+      DebugLogger.log(DebugTag.TEST_RUNNER, 'TreeProvider.ensureTestsCached.hit', {
+        configId: config.id,
+        cachedCount: this.testsCache.get(config.id)?.length ?? 0
+      });
+      return;
+    }
+
+    DebugLogger.log(DebugTag.TEST_RUNNER, 'TreeProvider.ensureTestsCached.miss', {
+      configId: config.id
+    });
+    const tests = await this.manager.discoverTests(config);
+    this.testsCache.set(config.id, tests);
+    DebugLogger.log(DebugTag.TEST_RUNNER, 'TreeProvider.ensureTestsCached.loaded', {
+      configId: config.id,
+      testCount: tests.length
     });
   }
 
@@ -348,12 +421,8 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
           return true;
         }
         // Check if any child file or test matches
-        const tests = folderMap.get(folderPath) || [];
-        return tests.some(test => {
-          const relativePath = vscode.workspace.asRelativePath(test.file, false);
-          const fileName = relativePath.split(/[/\\]/).pop() || '';
-          return this.matchesSearchQuery(fileName) || this.matchesSearchQuery(test.label);
-        });
+        const tests = this.getAllTestsInFolder(folderPath, folderMap, allFolderPaths);
+        return tests.some(test => this.testMatchesSearch(test));
       })
       .map(folderPath => {
         const item = new TestRunnerTreeItem('folder', config, undefined, undefined, folderPath);
@@ -432,12 +501,8 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
           return true;
         }
         // Check if any child matches
-        const tests = folderMap.get(folderPath) || [];
-        return tests.some(test => {
-          const relativePath = vscode.workspace.asRelativePath(test.file, false);
-          const fileName = relativePath.split(/[/\\]/).pop() || '';
-          return this.matchesSearchQuery(fileName) || this.matchesSearchQuery(test.label);
-        });
+        const tests = this.getAllTestsInFolder(folderPath, folderMap, allFolderPaths);
+        return tests.some(test => this.testMatchesSearch(test));
       })
       .map(folderPath => {
         // Show relative path: parent/current
@@ -529,9 +594,7 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
         }
         // Check if any child test matches
         const tests = fileMap.get(fileName) || [];
-        return tests.some(test => {
-          return this.matchesSearchQuery(test.label);
-        });
+        return tests.some(test => this.testMatchesSearch(test));
       })
       .map(fileName => {
         const item = new TestRunnerTreeItem('file', config, undefined, undefined, folderPath, fileName);
@@ -589,7 +652,7 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
     for (const [testCase, tests] of Array.from(testCaseMap.entries()).sort()) {
       // Filter test cases by search query
       if (this.searchQuery && !this.matchesSearchQuery(testCase) && 
-          !tests.some(test => this.matchesSearchQuery(test.label))) {
+          !tests.some(test => this.testMatchesSearch(test))) {
         continue;
       }
       
@@ -615,7 +678,7 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
     // Add tests without test case as direct children (no testcase wrapper)
     for (const test of noTestCaseTests) {
       // Filter tests by search query
-      if (this.searchQuery && !this.matchesSearchQuery(test.label)) {
+      if (this.searchQuery && !this.testMatchesSearch(test)) {
         continue;
       }
       
@@ -652,7 +715,7 @@ export class TestRunnerTreeProvider implements vscode.TreeDataProvider<TestRunne
         if (!this.searchQuery) {
           return true;
         }
-        return this.matchesSearchQuery(test.label);
+        return this.testMatchesSearch(test);
       })
       .map(test => {
         const item = new TestRunnerTreeItem('test', config, test);

@@ -855,58 +855,78 @@ export class TimeTrackerManager {
   }
 
   public async pauseAllTimersOnShutdown(): Promise<void> {
-    const config = this.getConfigInternal();
-    const autoPausedTimerIds: string[] = [];
-    const autoPausedSubtimerIds: Array<{ timerId: string; subtimerId: string }> = [];
-    const pauseTime = new Date().toISOString();
+    try {
+      const config = this.getConfigInternal();
+      const autoPausedTimerIds: string[] = [];
+      const autoPausedSubtimerIds: Array<{ timerId: string; subtimerId: string }> = [];
+      const pauseTime = new Date().toISOString();
 
-    const pauseAll = (folders: TimerFolder[]): void => {
-      for (const folder of folders) {
-        for (const timer of folder.timers) {
-          // Pause running subtimers (timers don't have their own endTime anymore)
-          if (timer.subtimers) {
-            let hadRunningSubtimer = false;
-            for (const subtimer of timer.subtimers) {
-              if (!subtimer.endTime) {
-                // Accumulate elapsed time before pausing on shutdown
-                const pauseTimeDate = new Date(pauseTime);
-                const lastResumeTime = subtimer.lastResumeTime ? new Date(subtimer.lastResumeTime) : new Date(subtimer.startTime);
-                const elapsedThisSegment = pauseTimeDate.getTime() - lastResumeTime.getTime();
-                
-                if (subtimer.totalElapsedTime === undefined) {
-                  subtimer.totalElapsedTime = elapsedThisSegment;
-                } else {
-                  subtimer.totalElapsedTime += elapsedThisSegment;
+      const pauseAll = (folders: TimerFolder[]): void => {
+        for (const folder of folders) {
+          for (const timer of folder.timers) {
+            // Pause running subtimers (timers don't have their own endTime anymore)
+            if (timer.subtimers) {
+              let hadRunningSubtimer = false;
+              for (const subtimer of timer.subtimers) {
+                if (!subtimer.endTime) {
+                  // Accumulate elapsed time before pausing on shutdown
+                  const pauseTimeDate = new Date(pauseTime);
+                  const lastResumeTime = subtimer.lastResumeTime ? new Date(subtimer.lastResumeTime) : new Date(subtimer.startTime);
+                  const elapsedThisSegment = pauseTimeDate.getTime() - lastResumeTime.getTime();
+                  
+                  if (subtimer.totalElapsedTime === undefined) {
+                    subtimer.totalElapsedTime = elapsedThisSegment;
+                  } else {
+                    subtimer.totalElapsedTime += elapsedThisSegment;
+                  }
+                  
+                  subtimer.endTime = pauseTime;
+                  this.syncLastPersistedElapsedTime(subtimer, subtimer.totalElapsedTime ?? 0);
+                  autoPausedSubtimerIds.push({ timerId: timer.id, subtimerId: subtimer.id });
+                  hadRunningSubtimer = true;
                 }
-                
-                subtimer.endTime = pauseTime;
-                this.syncLastPersistedElapsedTime(subtimer, subtimer.totalElapsedTime ?? 0);
-                autoPausedSubtimerIds.push({ timerId: timer.id, subtimerId: subtimer.id });
-                hadRunningSubtimer = true;
+              }
+              if (hadRunningSubtimer) {
+                autoPausedTimerIds.push(timer.id);
+                this.activeTimers.delete(timer.id);
               }
             }
-            if (hadRunningSubtimer) {
-              autoPausedTimerIds.push(timer.id);
-              this.activeTimers.delete(timer.id);
-            }
+          }
+          if (folder.subfolders) {
+            pauseAll(folder.subfolders);
           }
         }
-        if (folder.subfolders) {
-          pauseAll(folder.subfolders);
+      };
+
+      pauseAll(config.folders);
+
+      if (this.workspaceState) {
+        try {
+          await this.workspaceState.update('timeTracker.autoPausedTimers', autoPausedTimerIds);
+          await this.workspaceState.update('timeTracker.autoPausedSubtimers', autoPausedSubtimerIds);
+          await this.workspaceState.update('timeTracker.autoPausedTime', pauseTime);
+        } catch (error) {
+          if (this.isCancellationError(error)) {
+            return;
+          }
+          throw error;
         }
       }
-    };
 
-    pauseAll(config.folders);
-
-    // Store auto-paused timer and subtimer IDs in workspace state
-    if (this.workspaceState) {
-      await this.workspaceState.update('timeTracker.autoPausedTimers', autoPausedTimerIds);
-      await this.workspaceState.update('timeTracker.autoPausedSubtimers', autoPausedSubtimerIds);
-      await this.workspaceState.update('timeTracker.autoPausedTime', pauseTime);
+      try {
+        await this.saveConfig(config);
+      } catch (error) {
+        if (this.isCancellationError(error)) {
+          return;
+        }
+        throw error;
+      }
+    } catch (error) {
+      if (this.isCancellationError(error)) {
+        return;
+      }
+      throw error;
     }
-
-    await this.saveConfig(config);
   }
 
   public async saveTimersPeriodically(): Promise<void> {
@@ -1347,5 +1367,21 @@ export class TimeTrackerManager {
 
     timer.subtimers = reordered;
     await this.saveConfig(config);
+  }
+
+  private isCancellationError(error: unknown): boolean {
+    if (!error) {
+      return false;
+    }
+    if (error instanceof vscode.CancellationError) {
+      return true;
+    }
+    if (typeof error === 'object') {
+      const candidate = error as { name?: string; message?: string };
+      if (candidate.name === 'Canceled' || candidate.message === 'Canceled') {
+        return true;
+      }
+    }
+    return false;
   }
 }

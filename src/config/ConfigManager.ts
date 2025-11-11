@@ -5,7 +5,7 @@ import { CommandConfig, TimeTrackerConfig } from '../types';
 import { getDefaultConfig, validateConfig, getDefaultTimeTrackerConfig, validateTimeTrackerConfig } from './schema';
 
 export class ConfigManager {
-  private static instance: ConfigManager;
+  private static instance: ConfigManager | undefined;
   private config: CommandConfig;
   private configPath: string;
   private watcher?: vscode.FileSystemWatcher;
@@ -15,11 +15,18 @@ export class ConfigManager {
   private timeTrackerWatcher?: vscode.FileSystemWatcher;
   private onTimeTrackerChangeCallbacks: Array<() => void> = [];
   private pendingMigratedTimeTracker?: TimeTrackerConfig;
+  private legacyConfigPath: string;
+  private legacyTimeTrackerPath: string;
 
   private constructor() {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-    this.configPath = path.join(workspaceRoot, '.vscode', 'commands.json');
-    this.timeTrackerConfigPath = path.join(workspaceRoot, '.vscode', 'commands-timer.json');
+    const overrideRoot = process.env.COMMAND_MANAGER_CONFIG_ROOT;
+    const baseDir = overrideRoot ? path.resolve(overrideRoot) : path.join(workspaceRoot, '.vscode');
+    const commandsDir = path.join(baseDir, 'commands');
+    this.configPath = path.join(commandsDir, 'commands.json');
+    this.timeTrackerConfigPath = path.join(commandsDir, 'commands-timer.json');
+    this.legacyConfigPath = path.join(baseDir, 'commands.json');
+    this.legacyTimeTrackerPath = path.join(baseDir, 'commands-timer.json');
     this.config = getDefaultConfig();
     this.timeTrackerConfig = getDefaultTimeTrackerConfig();
   }
@@ -32,8 +39,10 @@ export class ConfigManager {
   }
 
   public async initialize(): Promise<void> {
+    // Prime in-memory caches from disk so downstream consumers have data immediately.
     await this.loadConfig();
     await this.loadTimeTrackerConfig();
+    // Watch the files so live edits stay in sync without manual reloads.
     this.setupFileWatcher();
     this.setupTimeTrackerFileWatcher();
     // Ensure initial consumers refresh with loaded config
@@ -63,6 +72,8 @@ export class ConfigManager {
 
   public async loadConfig(): Promise<void> {
     try {
+      await this.ensureCommandsDirectoryExists();
+      await this.migrateLegacyConfigIfNeeded();
       if (fs.existsSync(this.configPath)) {
         const configData = await fs.promises.readFile(this.configPath, 'utf8');
         const parsedConfig = JSON.parse(configData);
@@ -76,6 +87,7 @@ export class ConfigManager {
         const validation = validateConfig(parsedConfig);
         
         if (validation.valid) {
+          // Success path: keep the parsed data and normalise optional arrays.
           this.config = parsedConfig;
           // Ensure testRunners array exists (empty array is valid - user can delete default config)
           if (!this.config.testRunners) {
@@ -87,10 +99,12 @@ export class ConfigManager {
           }
 
           if (extractedTimeTracker) {
+            // Stash migrated data so the time-tracker loader can persist it into the new file.
             this.pendingMigratedTimeTracker = extractedTimeTracker;
             await this.writeCommandsConfigToDisk(this.config);
           }
         } else {
+          // Validation failure: surface a warning and revert to a safe default config.
           vscode.window.showWarningMessage(
             `Invalid configuration file: ${validation.errors.join(', ')}. Using default configuration.`
           );
@@ -103,6 +117,7 @@ export class ConfigManager {
         await this.writeCommandsConfigToDisk(this.config);
       }
     } catch (error) {
+      // Parse/IO errors: notify the user, reset to defaults, and rewrite the file so the next load succeeds.
       vscode.window.showErrorMessage(`Failed to load configuration: ${error}`);
       this.config = getDefaultConfig();
       await this.writeCommandsConfigToDisk(this.config);
@@ -112,39 +127,74 @@ export class ConfigManager {
   private async loadTimeTrackerConfig(): Promise<void> {
     try {
       if (this.pendingMigratedTimeTracker) {
+        // First activation after migration: merge and persist into the dedicated file.
         this.timeTrackerConfig = this.mergeWithDefaultTimeTracker(this.pendingMigratedTimeTracker);
         this.pendingMigratedTimeTracker = undefined;
         await this.saveTimeTrackerConfig(this.timeTrackerConfig, { suppressNotification: true });
+        await this.writeTimeTrackerBackup();
         return;
       }
 
-      if (fs.existsSync(this.timeTrackerConfigPath)) {
-        const configData = await fs.promises.readFile(this.timeTrackerConfigPath, 'utf8');
-        if (!configData.trim()) {
-          throw new Error('Time tracker configuration file is empty');
-        }
+      await this.ensureCommandsDirectoryExists();
+      await this.migrateLegacyTimeTrackerIfNeeded();
 
-        const parsedConfig = JSON.parse(configData);
-        const validation = validateTimeTrackerConfig(parsedConfig);
-
-        if (validation.valid) {
-          this.timeTrackerConfig = this.mergeWithDefaultTimeTracker(parsedConfig);
-        } else {
-          vscode.window.showWarningMessage(
-            `Invalid time tracker configuration file: ${validation.errors.join(', ')}. Using default configuration.`
-          );
-          this.timeTrackerConfig = getDefaultTimeTrackerConfig();
-          await this.saveTimeTrackerConfig(this.timeTrackerConfig, { suppressNotification: true });
-        }
-      } else {
+      if (!fs.existsSync(this.timeTrackerConfigPath)) {
+        // No file yet: create one lazily so future loads have a source.
         this.timeTrackerConfig = getDefaultTimeTrackerConfig();
         await this.saveTimeTrackerConfig(this.timeTrackerConfig, { suppressNotification: true });
+        await this.writeTimeTrackerBackup();
+        return;
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      vscode.window.showErrorMessage(`Failed to load time tracker configuration: ${message}`);
+
+      const configData = await fs.promises.readFile(this.timeTrackerConfigPath, 'utf8');
+
+      if (!configData.trim()) {
+        // Empty file usually means a crash or interrupted save; attempt recovery.
+        if (await this.attemptRestoreTimeTrackerConfigFromBackup('Time tracker configuration file was empty. Restored the most recent backup.')) {
+          return;
+        }
+        vscode.window.showWarningMessage('Time tracker configuration file is empty. Falling back to defaults in memory; please fix or replace the file to restore your data.');
+        this.timeTrackerConfig = getDefaultTimeTrackerConfig();
+        return;
+      }
+
+      let parsedConfig: TimeTrackerConfig;
+      try {
+        parsedConfig = JSON.parse(configData);
+      } catch (parseError) {
+        // Corrupted JSON: try the backup before falling back.
+        if (await this.attemptRestoreTimeTrackerConfigFromBackup('Time tracker configuration file was corrupted. Restored the most recent backup.')) {
+          return;
+        }
+        vscode.window.showErrorMessage('Failed to parse time tracker configuration. Loaded defaults in memory but left the file untouched so you can recover it manually.');
+        this.timeTrackerConfig = getDefaultTimeTrackerConfig();
+        return;
+      }
+
+      const validation = validateTimeTrackerConfig(parsedConfig);
+
+      if (validation.valid) {
+        // Success: ensure optional properties exist and keep the results.
+        this.timeTrackerConfig = this.mergeWithDefaultTimeTracker(parsedConfig);
+        await this.writeTimeTrackerBackup();
+        return;
+      }
+
+      // Invalid structure: prefer backup recovery; otherwise fall back without touching disk.
+      if (await this.attemptRestoreTimeTrackerConfigFromBackup('Invalid time tracker configuration detected. Restored the most recent backup.')) {
+        return;
+      }
+      vscode.window.showWarningMessage(
+        `Invalid time tracker configuration file: ${validation.errors.join(', ')}. Loaded defaults in memory but left the file untouched so you can repair it.`
+      );
       this.timeTrackerConfig = getDefaultTimeTrackerConfig();
-      await this.saveTimeTrackerConfig(this.timeTrackerConfig, { suppressNotification: true });
+    } catch (error) {
+      if (await this.attemptRestoreTimeTrackerConfigFromBackup()) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Failed to load time tracker configuration (${message}). Loaded defaults in memory but left the file untouched.`);
+      this.timeTrackerConfig = getDefaultTimeTrackerConfig();
     }
   }
 
@@ -160,16 +210,14 @@ export class ConfigManager {
     this.onTimeTrackerChangeCallbacks.push(callback);
   }
 
-  public async saveTimeTrackerConfig(config: TimeTrackerConfig, options?: { suppressNotification?: boolean }): Promise<void> {
+  public async saveTimeTrackerConfig(config: TimeTrackerConfig, options?: { suppressNotification?: boolean; skipBackup?: boolean }): Promise<void> {
     const validation = validateTimeTrackerConfig(config);
     if (!validation.valid) {
       throw new Error(`Invalid time tracker configuration: ${validation.errors.join(', ')}`);
     }
 
     this.timeTrackerConfig = this.mergeWithDefaultTimeTracker(config);
-    this.ensureVscodeDirectoryExists();
-    const configJson = JSON.stringify(this.timeTrackerConfig, null, 2);
-    await fs.promises.writeFile(this.timeTrackerConfigPath, configJson, 'utf8');
+    await this.writeTimeTrackerConfigToDisk(this.timeTrackerConfig, { skipBackup: options?.skipBackup });
 
     if (!options?.suppressNotification) {
       this.notifyTimeTrackerChange();
@@ -273,17 +321,141 @@ export class ConfigManager {
     };
   }
 
-  private ensureVscodeDirectoryExists(): void {
-    const vscodeDir = path.dirname(this.configPath);
-    if (!fs.existsSync(vscodeDir)) {
-      fs.mkdirSync(vscodeDir, { recursive: true });
+  private getTimeTrackerBackupPath(): string {
+    const dir = path.dirname(this.timeTrackerConfigPath);
+    return path.join(dir, 'commands-timer-backup.json');
+  }
+
+  private async attemptRestoreTimeTrackerConfigFromBackup(message?: string): Promise<boolean> {
+    const candidates: string[] = [
+      this.getTimeTrackerBackupPath(),
+      `${this.timeTrackerConfigPath}.backup`,
+      path.join(path.dirname(this.legacyTimeTrackerPath), 'commands-timer-backup.json'),
+      `${this.legacyTimeTrackerPath}.backup`
+    ];
+
+    const sourcePath = candidates.find(candidate => candidate && fs.existsSync(candidate));
+    if (!sourcePath) {
+      return false;
+    }
+
+    try {
+      const backupData = await fs.promises.readFile(sourcePath, 'utf8');
+      if (!backupData.trim()) {
+        return false;
+      }
+
+      const parsedConfig = JSON.parse(backupData);
+      const validation = validateTimeTrackerConfig(parsedConfig);
+
+      if (!validation.valid) {
+        return false;
+      }
+
+      this.timeTrackerConfig = this.mergeWithDefaultTimeTracker(parsedConfig);
+      await this.writeTimeTrackerConfigToDisk(this.timeTrackerConfig, { skipBackup: true });
+      await this.writeTimeTrackerBackup();
+
+      if (message) {
+        vscode.window.showWarningMessage(message);
+      }
+
+      this.notifyTimeTrackerChange();
+      return true;
+    } catch (restoreError) {
+      return false;
+    }
+  }
+
+  private async writeTimeTrackerConfigToDisk(config: TimeTrackerConfig, options?: { skipBackup?: boolean }): Promise<void> {
+    await this.ensureCommandsDirectoryExists();
+
+    const jsonContent = JSON.stringify(config, null, 2);
+    const tempPath = `${this.timeTrackerConfigPath}.tmp`;
+
+    if (!options?.skipBackup && fs.existsSync(this.timeTrackerConfigPath)) {
+      try {
+        await fs.promises.copyFile(this.timeTrackerConfigPath, this.getTimeTrackerBackupPath());
+      } catch {
+        // Best-effort backup. Ignore failures but do not stop save.
+      }
+    }
+
+    await fs.promises.writeFile(tempPath, jsonContent, 'utf8');
+
+    if (fs.existsSync(this.timeTrackerConfigPath)) {
+      try {
+        await fs.promises.unlink(this.timeTrackerConfigPath);
+      } catch {
+        // If unlink fails, attempt to overwrite via rename anyway.
+      }
+    }
+
+    try {
+      await fs.promises.rename(tempPath, this.timeTrackerConfigPath);
+    } catch {
+      // Fallback: attempt direct write and clean up temp file.
+      await fs.promises.writeFile(this.timeTrackerConfigPath, jsonContent, 'utf8');
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch {
+        // ignore cleanup failure
+      }
+    }
+  }
+
+  private async writeTimeTrackerBackup(): Promise<void> {
+    try {
+      if (!fs.existsSync(this.timeTrackerConfigPath)) {
+        return;
+      }
+      await this.ensureCommandsDirectoryExists();
+      const backupPath = this.getTimeTrackerBackupPath();
+      await fs.promises.copyFile(this.timeTrackerConfigPath, backupPath);
+    } catch {
+      // Ignore backup failures to avoid interrupting load flow.
+    }
+  }
+
+  private async ensureCommandsDirectoryExists(): Promise<void> {
+    const commandsDir = path.dirname(this.configPath);
+    if (!fs.existsSync(commandsDir)) {
+      await fs.promises.mkdir(commandsDir, { recursive: true });
     }
   }
 
   private async writeCommandsConfigToDisk(config: CommandConfig): Promise<void> {
-    this.ensureVscodeDirectoryExists();
+    await this.ensureCommandsDirectoryExists();
     const configJson = JSON.stringify(config, null, 2);
     await fs.promises.writeFile(this.configPath, configJson, 'utf8');
+  }
+
+  private async migrateLegacyConfigIfNeeded(): Promise<void> {
+    if (fs.existsSync(this.configPath) || !fs.existsSync(this.legacyConfigPath)) {
+      return;
+    }
+
+    try {
+      await this.ensureCommandsDirectoryExists();
+      await fs.promises.copyFile(this.legacyConfigPath, this.configPath);
+      await fs.promises.unlink(this.legacyConfigPath);
+    } catch {
+      // Best effort migration; ignore failures.
+    }
+  }
+
+  private async migrateLegacyTimeTrackerIfNeeded(): Promise<void> {
+    if (fs.existsSync(this.timeTrackerConfigPath) || !fs.existsSync(this.legacyTimeTrackerPath)) {
+      return;
+    }
+
+    try {
+      await this.ensureCommandsDirectoryExists();
+      await fs.promises.copyFile(this.legacyTimeTrackerPath, this.timeTrackerConfigPath);
+      await fs.promises.unlink(this.legacyTimeTrackerPath);
+    } catch {
+      // Best effort migration; ignore failures.
+    }
   }
 
   public async importCommands(filePath: string): Promise<void> {
@@ -301,5 +473,12 @@ export class ConfigManager {
   public async exportCommands(filePath: string): Promise<void> {
     const configJson = JSON.stringify(this.config, null, 2);
     await fs.promises.writeFile(filePath, configJson, 'utf8');
+  }
+
+  public static resetForTests(): void {
+    if (ConfigManager.instance) {
+      ConfigManager.instance.dispose();
+      ConfigManager.instance = undefined;
+    }
   }
 }
