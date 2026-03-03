@@ -1,0 +1,174 @@
+{
+  "name": "test-runner-extension",
+  "displayName": "Leo's Tools - Multi Framework Test Runner",
+  "description": "Discover, organize, and run tests across multiple frameworks from one tree.",
+  "version": "0.0.1",
+  "publisher": "LeonardoSouza",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing"
+  ],
+  "activationEvents": [
+    "onView:testRunnerTreeExt",
+    "onCommand:testRunnerExt.runAll",
+    "onCommand:testRunnerExt.findTests",
+    "onCommand:testRunnerExt.refresh",
+    "onCommand:testRunnerExt.search",
+    "onCommand:testRunnerExt.newConfiguration",
+    "onCommand:testRunnerExt.openConfiguration",
+    "onCommand:testRunnerExt.stopAll",
+    "onCommand:testRunnerExt.runConfiguration",
+    "onCommand:testRunnerExt.runFolder",
+    "onCommand:testRunnerExt.runFile",
+    "onCommand:testRunnerExt.runTestCase",
+    "onCommand:testRunnerExt.expandAll",
+    "onCommand:testRunnerExt.collapseAll",
+    "onCommand:testRunnerExt.moveUp",
+    "onCommand:testRunnerExt.moveDown",
+    "onCommand:testRunnerExt.moveTo",
+    "onCommand:testRunnerExt.disableConfiguration",
+    "onCommand:testRunnerExt.enableConfiguration",
+    "onCommand:testRunnerExt.runTest",
+    "onCommand:testRunnerExt.ignoreTest",
+    "onCommand:testRunnerExt.gotoTest"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "shared-commands-hub": [
+        {
+          "id": "testRunnerTreeExt",
+          "name": "Test Runner",
+          "group": "2_test_runner"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "testRunnerExt.runAll",
+        "title": "Test Runner: Run All",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "testRunnerExt.findTests",
+        "title": "Test Runner: Find Tests",
+        "icon": "$(search)"
+      },
+      {
+        "command": "testRunnerExt.refresh",
+        "title": "Test Runner: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "testRunnerExt.search",
+        "title": "Test Runner: Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "testRunnerExt.newConfiguration",
+        "title": "Test Runner: New Configuration",
+        "icon": "$(add)"
+      },
+      {
+        "command": "testRunnerExt.openConfiguration",
+        "title": "Test Runner: Open Configuration",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "testRunnerExt.stopAll",
+        "title": "Test Runner: Stop All",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "testRunnerExt.runConfiguration",
+        "title": "Test Runner: Run Configuration",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "testRunnerExt.runFolder",
+        "title": "Test Runner: Run Folder",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "testRunnerExt.runFile",
+        "title": "Test Runner: Run File",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "testRunnerExt.runTestCase",
+        "title": "Test Runner: Run Test Case",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "testRunnerExt.expandAll",
+        "title": "Test Runner: Expand All"
+      },
+      {
+        "command": "testRunnerExt.collapseAll",
+        "title": "Test Runner: Collapse All"
+      },
+      {
+        "command": "testRunnerExt.moveUp",
+        "title": "Test Runner: Move Up",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "testRunnerExt.moveDown",
+        "title": "Test Runner: Move Down",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "testRunnerExt.moveTo",
+        "title": "Test Runner: Move To",
+        "icon": "$(folder-move)"
+      },
+      {
+        "command": "testRunnerExt.disableConfiguration",
+        "title": "Test Runner: Disable Configuration"
+      },
+      {
+        "command": "testRunnerExt.enableConfiguration",
+        "title": "Test Runner: Enable Configuration"
+      },
+      {
+        "command": "testRunnerExt.runTest",
+        "title": "Test Runner: Run Test",
+        "icon": "$(play)"
+      },
+      {
+        "command": "testRunnerExt.ignoreTest",
+        "title": "Test Runner: Ignore Test"
+      },
+      {
+        "command": "testRunnerExt.gotoTest",
+        "title": "Test Runner: Go to Test"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "testRunnerExt.runAll",
+          "when": "view == testRunnerTreeExt",
+          "group": "navigation@1"
+        },
+        {
+          "command": "testRunnerExt.findTests",
+          "when": "view == testRunnerTreeExt",
+          "group": "navigation@2"
+        },
+        {
+          "command": "testRunnerExt.search",
+          "when": "view == testRunnerTreeExt",
+          "group": "navigation@3"
+        },
+        {
+          "command": "testRunnerExt.refresh",
+          "when": "view == testRunnerTreeExt",
+          "group": "navigation@9"
+        }
+      ]
+    }
+  }
+}

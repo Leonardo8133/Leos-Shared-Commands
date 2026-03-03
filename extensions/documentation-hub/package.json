@@ -1,0 +1,102 @@
+{
+  "name": "documentation-hub-extension",
+  "displayName": "Leo's Tools - Markdown Documentation Hub",
+  "description": "Browse workspace documentation, search sections, and extract runnable commands.",
+  "version": "0.0.1",
+  "publisher": "LeonardoSouza",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:documentationHubTreeExt",
+    "onCommand:documentationHubExt.search",
+    "onCommand:documentationHubExt.toggleViewMode",
+    "onCommand:documentationHubExt.refresh",
+    "onCommand:documentationHubExt.openFile",
+    "onCommand:documentationHubExt.copyPath",
+    "onCommand:documentationHubExt.extractCommands",
+    "onCommand:documentationHubExt.openSection",
+    "onCommand:documentationHubExt.hideItem",
+    "onCommand:documentationHubExt.unhideItem",
+    "onCommand:documentationHubExt.unhideAll"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "shared-commands-hub": [
+        {
+          "id": "documentationHubTreeExt",
+          "name": "Documentation Hub",
+          "group": "3_documentation"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "documentationHubExt.search",
+        "title": "Documentation Hub: Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "documentationHubExt.toggleViewMode",
+        "title": "Documentation Hub: Toggle View Mode",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "documentationHubExt.refresh",
+        "title": "Documentation Hub: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "documentationHubExt.openFile",
+        "title": "Documentation Hub: Open File"
+      },
+      {
+        "command": "documentationHubExt.copyPath",
+        "title": "Documentation Hub: Copy Path"
+      },
+      {
+        "command": "documentationHubExt.extractCommands",
+        "title": "Documentation Hub: Extract Commands"
+      },
+      {
+        "command": "documentationHubExt.openSection",
+        "title": "Documentation Hub: Open Section"
+      },
+      {
+        "command": "documentationHubExt.hideItem",
+        "title": "Documentation Hub: Hide Item"
+      },
+      {
+        "command": "documentationHubExt.unhideItem",
+        "title": "Documentation Hub: Unhide Item"
+      },
+      {
+        "command": "documentationHubExt.unhideAll",
+        "title": "Documentation Hub: Unhide All"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "documentationHubExt.search",
+          "when": "view == documentationHubTreeExt",
+          "group": "navigation@1"
+        },
+        {
+          "command": "documentationHubExt.toggleViewMode",
+          "when": "view == documentationHubTreeExt",
+          "group": "navigation@2"
+        },
+        {
+          "command": "documentationHubExt.refresh",
+          "when": "view == documentationHubTreeExt",
+          "group": "navigation@9"
+        }
+      ]
+    }
+  }
+}

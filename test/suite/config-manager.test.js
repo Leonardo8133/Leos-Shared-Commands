@@ -105,5 +105,29 @@ suite('ConfigManager filesystem layout', () => {
     const migratedTimerConfig = JSON.parse(fs.readFileSync(migratedTimer, 'utf8'));
     assert.deepStrictEqual(migratedTimerConfig.folders, legacyTimer.folders, 'migrated timer config should preserve folders');
   });
+  test('invalid legacy files are not deleted during migration', async function () {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+      this.skip();
+      return;
+    }
+
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'config-manager-invalid-migrate-'));
+
+    fs.writeFileSync(path.join(tempRoot, 'commands.json'), JSON.stringify({ invalid: true }, null, 2));
+    fs.writeFileSync(path.join(tempRoot, 'commands-timer.json'), JSON.stringify({ invalid: true }, null, 2));
+
+    const manager = await initializeWithTempRoot();
+    manager.dispose();
+
+    const commandsDir = path.join(tempRoot, 'commands');
+    const migratedCommands = path.join(commandsDir, 'commands.json');
+    const migratedTimer = path.join(commandsDir, 'commands-timer.json');
+
+    assert.ok(fs.existsSync(path.join(tempRoot, 'commands.json')), 'invalid legacy commands.json should be kept');
+    assert.ok(fs.existsSync(path.join(tempRoot, 'commands-timer.json')), 'invalid legacy commands-timer.json should be kept');
+    assert.ok(!fs.existsSync(migratedCommands), 'invalid migrated commands.json should be removed');
+    assert.ok(!fs.existsSync(migratedTimer), 'invalid migrated commands-timer.json should be removed');
+  });
+
 });
 

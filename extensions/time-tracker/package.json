@@ -1,0 +1,138 @@
+{
+  "name": "time-tracker-extension",
+  "displayName": "Leo's Tools - Git Aware Time Tracker",
+  "description": "Track work time with timers, folders, and git-aware automation.",
+  "version": "0.0.1",
+  "publisher": "LeonardoSouza",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:timeTrackerTreeExt",
+    "onCommand:timeTrackerExt.refresh",
+    "onCommand:timeTrackerExt.focusView",
+    "onCommand:timeTrackerExt.startTimer",
+    "onCommand:timeTrackerExt.stopTimer",
+    "onCommand:timeTrackerExt.resumeTimer",
+    "onCommand:timeTrackerExt.stopAll",
+    "onCommand:timeTrackerExt.editTimer",
+    "onCommand:timeTrackerExt.deleteTimer",
+    "onCommand:timeTrackerExt.archiveTimer",
+    "onCommand:timeTrackerExt.newFolder",
+    "onCommand:timeTrackerExt.moveToFolder",
+    "onCommand:timeTrackerExt.moveTimerUp",
+    "onCommand:timeTrackerExt.moveTimerDown",
+    "onCommand:timeTrackerExt.createSubTimer",
+    "onCommand:timeTrackerExt.startSubTimer",
+    "onCommand:timeTrackerExt.stopSubTimer",
+    "onCommand:timeTrackerExt.editSubTimer",
+    "onCommand:timeTrackerExt.deleteSubTimer"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "shared-commands-hub": [
+        {
+          "id": "timeTrackerTreeExt",
+          "name": "Time Tracker",
+          "group": "4_time_tracker"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "timeTrackerExt.refresh",
+        "title": "Time Tracker: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "timeTrackerExt.focusView",
+        "title": "Time Tracker: Focus View"
+      },
+      {
+        "command": "timeTrackerExt.toggleEnabled",
+        "title": "Time Tracker: Toggle Enabled"
+      },
+      {
+        "command": "timeTrackerExt.toggleBranchAutomation",
+        "title": "Time Tracker: Toggle Branch Automation"
+      },
+      {
+        "command": "timeTrackerExt.startTimer",
+        "title": "Time Tracker: Start Timer"
+      },
+      {
+        "command": "timeTrackerExt.stopTimer",
+        "title": "Time Tracker: Stop Timer"
+      },
+      {
+        "command": "timeTrackerExt.resumeTimer",
+        "title": "Time Tracker: Resume Timer"
+      },
+      {
+        "command": "timeTrackerExt.stopAll",
+        "title": "Time Tracker: Stop All"
+      },
+      {
+        "command": "timeTrackerExt.editTimer",
+        "title": "Time Tracker: Edit Timer"
+      },
+      {
+        "command": "timeTrackerExt.deleteTimer",
+        "title": "Time Tracker: Delete Timer"
+      },
+      {
+        "command": "timeTrackerExt.archiveTimer",
+        "title": "Time Tracker: Archive Timer"
+      },
+      {
+        "command": "timeTrackerExt.newFolder",
+        "title": "Time Tracker: New Folder"
+      },
+      {
+        "command": "timeTrackerExt.moveToFolder",
+        "title": "Time Tracker: Move To Folder"
+      },
+      {
+        "command": "timeTrackerExt.moveTimerUp",
+        "title": "Time Tracker: Move Timer Up"
+      },
+      {
+        "command": "timeTrackerExt.moveTimerDown",
+        "title": "Time Tracker: Move Timer Down"
+      },
+      {
+        "command": "timeTrackerExt.createSubTimer",
+        "title": "Time Tracker: Create SubTimer"
+      },
+      {
+        "command": "timeTrackerExt.startSubTimer",
+        "title": "Time Tracker: Start SubTimer"
+      },
+      {
+        "command": "timeTrackerExt.stopSubTimer",
+        "title": "Time Tracker: Stop SubTimer"
+      },
+      {
+        "command": "timeTrackerExt.editSubTimer",
+        "title": "Time Tracker: Edit SubTimer"
+      },
+      {
+        "command": "timeTrackerExt.deleteSubTimer",
+        "title": "Time Tracker: Delete SubTimer"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "timeTrackerExt.refresh",
+          "when": "view == timeTrackerTreeExt",
+          "group": "navigation@9"
+        }
+      ]
+    }
+  }
+}
