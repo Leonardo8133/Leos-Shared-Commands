@@ -901,7 +901,12 @@
     "test:ui": "npx wdio run wdio.conf.js",
     "test:ui:single": "npx wdio run wdio.conf.js --spec",
     "test:all": "npm test && npm run test:playwright && npm run test:ui",
-    "test:vet": "vscode-extension-tester --config ./et-tests/mocha-vscode.json"
+    "test:vet": "vscode-extension-tester --config ./et-tests/mocha-vscode.json",
+    "build:ext:tasks": "tsc -p extensions/tasks/tsconfig.json",
+    "build:ext:test-runner": "tsc -p extensions/test-runner/tsconfig.json",
+    "build:ext:documentation-hub": "tsc -p extensions/documentation-hub/tsconfig.json",
+    "build:ext:time-tracker": "tsc -p extensions/time-tracker/tsconfig.json",
+    "build:ext:all": "npm run build:ext:tasks && npm run build:ext:test-runner && npm run build:ext:documentation-hub && npm run build:ext:time-tracker"
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1"
@@ -926,5 +931,9 @@
     "vscode-extension-tester": "^6.0.0",
     "wdio-vscode-service": "^6.1.4",
     "webdriverio": "^8.46.0"
-  }
+  },
+  "workspaces": [
+    "extensions/*",
+    "packages/*"
+  ]
 }

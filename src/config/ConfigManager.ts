@@ -443,6 +443,15 @@ export class ConfigManager {
     try {
       await this.ensureCommandsDirectoryExists();
       await fs.promises.copyFile(this.legacyConfigPath, this.configPath);
+
+      const migratedData = await fs.promises.readFile(this.configPath, 'utf8');
+      const migratedConfig = JSON.parse(migratedData);
+      const validation = validateConfig(migratedConfig);
+      if (!validation.valid) {
+        await fs.promises.unlink(this.configPath);
+        return;
+      }
+
       await fs.promises.unlink(this.legacyConfigPath);
     } catch {
       // Best effort migration; ignore failures.
@@ -457,6 +466,15 @@ export class ConfigManager {
     try {
       await this.ensureCommandsDirectoryExists();
       await fs.promises.copyFile(this.legacyTimeTrackerPath, this.timeTrackerConfigPath);
+
+      const migratedData = await fs.promises.readFile(this.timeTrackerConfigPath, 'utf8');
+      const migratedConfig = JSON.parse(migratedData);
+      const validation = validateTimeTrackerConfig(migratedConfig);
+      if (!validation.valid) {
+        await fs.promises.unlink(this.timeTrackerConfigPath);
+        return;
+      }
+
       await fs.promises.unlink(this.legacyTimeTrackerPath);
     } catch {
       // Best effort migration; ignore failures.
